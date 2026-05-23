@@ -30,6 +30,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.smarttasker.ui.screens.HomeScreen
 import com.smarttasker.ui.screens.TaskScreen
+import com.smarttasker.ui.screens.TaskEditorScreen
+import com.smarttasker.ui.screens.ScriptEditorScreen
+import com.smarttasker.ui.screens.StepEditorScreen
+import com.smarttasker.ui.screens.TaskTestScreen
+import com.smarttasker.ui.screens.ScriptImportExportScreen
 import com.smarttasker.ui.screens.SettingsScreen
 import com.smarttasker.ui.theme.SmartTaskerTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -131,10 +136,84 @@ fun MainScreen() {
                 HomeScreen()
             }
             composable(NavigationItem.Task.route) {
-                TaskScreen()
+                TaskScreen(
+                    onNavigateToTaskEditor = { taskId ->
+                        if (taskId != null) {
+                            navController.navigate("task_editor/$taskId")
+                        } else {
+                            navController.navigate("task_editor")
+                        }
+                    },
+                    onNavigateToScriptEditor = { scriptId ->
+                        if (scriptId != null) {
+                            navController.navigate("script_editor/$scriptId")
+                        } else {
+                            navController.navigate("script_editor")
+                        }
+                    },
+                    onNavigateToTaskTest = { taskId ->
+                        navController.navigate("task_test/$taskId")
+                    },
+                    onNavigateToScriptImportExport = {
+                        navController.navigate("script_import_export")
+                    }
+                )
             }
             composable(NavigationItem.Settings.route) {
                 SettingsScreen()
+            }
+            composable("task_editor/{taskId}") { backStackEntry ->
+                val taskId = backStackEntry.arguments?.getString("taskId")
+                TaskEditorScreen(
+                    taskId = taskId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("task_editor") {
+                TaskEditorScreen(
+                    taskId = null,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("script_editor/{scriptId}") { backStackEntry ->
+                val scriptId = backStackEntry.arguments?.getString("scriptId")
+                ScriptEditorScreen(
+                    scriptId = scriptId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToStepEditor = { sId, stepIndex ->
+                        navController.navigate("step_editor/$sId/$stepIndex")
+                    }
+                )
+            }
+            composable("script_editor") {
+                ScriptEditorScreen(
+                    scriptId = null,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToStepEditor = { sId, stepIndex ->
+                        navController.navigate("step_editor/$sId/$stepIndex")
+                    }
+                )
+            }
+            composable("step_editor/{scriptId}/{stepIndex}") { backStackEntry ->
+                val scriptId = backStackEntry.arguments?.getString("scriptId") ?: ""
+                val stepIndex = backStackEntry.arguments?.getString("stepIndex")?.toIntOrNull() ?: 0
+                StepEditorScreen(
+                    scriptId = scriptId,
+                    stepIndex = stepIndex,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("task_test/{taskId}") { backStackEntry ->
+                val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+                TaskTestScreen(
+                    taskId = taskId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("script_import_export") {
+                ScriptImportExportScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     }

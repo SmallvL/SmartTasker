@@ -121,19 +121,19 @@ data class ScriptStepEntity(
 /**
  * 步骤操作类型
  */
-enum class StepOperation {
-    TAP,              // 点击
-    LONG_PRESS,       // 长按
-    SWIPE,            // 滑动
-    INPUT,            // 输入文本
-    WAIT,             // 等待
-    BACK,             // 返回键
-    HOME,             // Home 键
-    SCROLL,           // 滚动
-    LAUNCH_APP,       // 启动应用
-    WAIT_FOR_ELEMENT, // 等待元素出现
-    VERIFY,           // 验证条件
-    COMMAND           // 自定义命令
+enum class StepOperation(val title: String) {
+    TAP("点击"),
+    LONG_PRESS("长按"),
+    SWIPE("滑动"),
+    INPUT("输入文本"),
+    WAIT("等待"),
+    BACK("返回键"),
+    HOME("Home 键"),
+    SCROLL("滚动"),
+    LAUNCH_APP("启动应用"),
+    WAIT_FOR_ELEMENT("等待元素出现"),
+    VERIFY("验证条件"),
+    COMMAND("自定义命令")
 }
 
 // ============================================================

@@ -33,6 +33,7 @@ import com.smarttasker.model.TaskType
 fun TaskCard(
     task: TaskItem,
     onRun: () -> Unit,
+    onTest: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -72,6 +73,15 @@ fun TaskCard(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = "运行",
                             tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    IconButton(onClick = onTest, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "测试",
+                            tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(20.dp)
                         )
                     }

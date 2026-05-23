@@ -2,6 +2,8 @@ package com.smarttasker.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.smarttasker.core.repository.ScriptRepository
+import com.smarttasker.core.repository.TaskRepository
 import com.smarttasker.model.ScriptItem
 import com.smarttasker.model.TaskItem
 import com.smarttasker.model.TaskType
@@ -16,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
-    // 注入依赖
+    private val taskRepository: TaskRepository,
+    private val scriptRepository: ScriptRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -32,35 +35,9 @@ class TaskViewModel @Inject constructor(
      */
     private fun loadTasks() {
         viewModelScope.launch {
-            // TODO: 从数据库加载任务
-            val tasks = listOf(
-                TaskItem(
-                    id = "1",
-                    name = "每日签到",
-                    description = "自动签到获取奖励",
-                    type = TaskType.SCHEDULED,
-                    isEnabled = true,
-                    lastRunTime = System.currentTimeMillis() - 86400000
-                ),
-                TaskItem(
-                    id = "2",
-                    name = "清理缓存",
-                    description = "清理应用缓存释放空间",
-                    type = TaskType.SINGLE,
-                    isEnabled = false,
-                    lastRunTime = null
-                ),
-                TaskItem(
-                    id = "3",
-                    name = "消息回复",
-                    description = "自动回复特定消息",
-                    type = TaskType.TRIGGERED,
-                    isEnabled = true,
-                    lastRunTime = System.currentTimeMillis() - 3600000
-                )
-            )
-            
-            _uiState.update { it.copy(tasks = tasks) }
+            taskRepository.getAllTasks().collect { tasks ->
+                _uiState.update { it.copy(tasks = tasks) }
+            }
         }
     }
     
@@ -69,35 +46,9 @@ class TaskViewModel @Inject constructor(
      */
     private fun loadScripts() {
         viewModelScope.launch {
-            // TODO: 从数据库加载脚本
-            val scripts = listOf(
-                ScriptItem(
-                    id = "1",
-                    name = "微信发消息",
-                    description = "自动发送微信消息",
-                    category = "社交",
-                    stepCount = 5,
-                    lastModified = System.currentTimeMillis() - 86400000
-                ),
-                ScriptItem(
-                    id = "2",
-                    name = "淘宝签到",
-                    description = "自动签到获取金币",
-                    category = "购物",
-                    stepCount = 3,
-                    lastModified = System.currentTimeMillis() - 172800000
-                ),
-                ScriptItem(
-                    id = "3",
-                    name = "抖音点赞",
-                    description = "自动点赞视频",
-                    category = "娱乐",
-                    stepCount = 4,
-                    lastModified = System.currentTimeMillis() - 259200000
-                )
-            )
-            
-            _uiState.update { it.copy(scripts = scripts) }
+            scriptRepository.getAllScripts().collect { scripts ->
+                _uiState.update { it.copy(scripts = scripts) }
+            }
         }
     }
     
@@ -127,15 +78,6 @@ class TaskViewModel @Inject constructor(
     }
     
     /**
-     * 编辑任务
-     */
-    fun editTask(taskId: String) {
-        viewModelScope.launch {
-            // TODO: 跳转到任务编辑页面
-        }
-    }
-    
-    /**
      * 删除任务
      */
     fun deleteTask(taskId: String) {
@@ -143,15 +85,8 @@ class TaskViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
             
             try {
-                // TODO: 从数据库删除任务
-                
-                val tasks = _uiState.value.tasks.filter { it.id != taskId }
-                _uiState.update { 
-                    it.copy(
-                        tasks = tasks,
-                        isLoading = false
-                    )
-                }
+                taskRepository.deleteTask(taskId)
+                _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update { 
                     it.copy(
@@ -188,15 +123,6 @@ class TaskViewModel @Inject constructor(
     }
     
     /**
-     * 编辑脚本
-     */
-    fun editScript(scriptId: String) {
-        viewModelScope.launch {
-            // TODO: 跳转到脚本编辑页面
-        }
-    }
-    
-    /**
      * 删除脚本
      */
     fun deleteScript(scriptId: String) {
@@ -204,15 +130,8 @@ class TaskViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
             
             try {
-                // TODO: 从数据库删除脚本
-                
-                val scripts = _uiState.value.scripts.filter { it.id != scriptId }
-                _uiState.update { 
-                    it.copy(
-                        scripts = scripts,
-                        isLoading = false
-                    )
-                }
+                scriptRepository.deleteScript(scriptId)
+                _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update { 
                     it.copy(

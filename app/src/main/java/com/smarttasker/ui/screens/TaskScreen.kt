@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,6 +49,10 @@ import com.smarttasker.ui.components.TaskCard
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskScreen(
+    onNavigateToTaskEditor: (String?) -> Unit = {},
+    onNavigateToScriptEditor: (String?) -> Unit = {},
+    onNavigateToTaskTest: (String) -> Unit = {},
+    onNavigateToScriptImportExport: () -> Unit = {},
     viewModel: TaskViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -86,7 +91,8 @@ fun TaskScreen(
                 TaskCard(
                     task = task,
                     onRun = { viewModel.runTask(task.id) },
-                    onEdit = { viewModel.editTask(task.id) },
+                    onTest = { onNavigateToTaskTest(task.id) },
+                    onEdit = { onNavigateToTaskEditor(task.id) },
                     onDelete = { viewModel.deleteTask(task.id) }
                 )
             }
@@ -95,7 +101,8 @@ fun TaskScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 SectionHeader(
                     title = "脚本管理",
-                    onAddClick = { viewModel.showAddScriptDialog() }
+                    onAddClick = { viewModel.showAddScriptDialog() },
+                    onImportExportClick = onNavigateToScriptImportExport
                 )
             }
             
@@ -103,7 +110,7 @@ fun TaskScreen(
                 ScriptCard(
                     script = script,
                     onRun = { viewModel.runScript(script.id) },
-                    onEdit = { viewModel.editScript(script.id) },
+                    onEdit = { onNavigateToScriptEditor(script.id) },
                     onDelete = { viewModel.deleteScript(script.id) }
                 )
             }
@@ -111,8 +118,8 @@ fun TaskScreen(
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 QuickCreateCard(
-                    onCreateTask = { viewModel.showAddTaskDialog() },
-                    onCreateScript = { viewModel.showAddScriptDialog() }
+                    onCreateTask = { onNavigateToTaskEditor(null) },
+                    onCreateScript = { onNavigateToScriptEditor(null) }
                 )
             }
             
@@ -124,7 +131,11 @@ fun TaskScreen(
 }
 
 @Composable
-fun SectionHeader(title: String, onAddClick: () -> Unit) {
+fun SectionHeader(
+    title: String, 
+    onAddClick: () -> Unit,
+    onImportExportClick: (() -> Unit)? = null
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -136,15 +147,30 @@ fun SectionHeader(title: String, onAddClick: () -> Unit) {
             fontWeight = FontWeight.Bold
         )
         
-        IconButton(
-            onClick = onAddClick,
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "添加",
-                tint = MaterialTheme.colorScheme.primary
-            )
+        Row {
+            if (onImportExportClick != null) {
+                IconButton(
+                    onClick = onImportExportClick,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "导入导出",
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+            
+            IconButton(
+                onClick = onAddClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "添加",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
