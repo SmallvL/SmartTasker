@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题颜色 -->
+    <color name="primary">#FF007AFF</color>
+    <color name="primary_variant">#FF0056B3</color>
+    <color name="on_primary">#FFFFFFFF</color>
+    
+    <color name="secondary">#FF5856D6</color>
+    <color name="secondary_variant">#FF3D3BAC</color>
+    <color name="on_secondary">#FFFFFFFF</color>
+    
+    <color name="tertiary">#FFFF9500</color>
+    <color name="tertiary_variant">#FFCC7700</color>
+    <color name="on_tertiary">#FFFFFFFF</color>
+    
+    <color name="error">#FFFF3B30</color>
+    <color name="error_variant">#FFCC2F26</color>
+    <color name="on_error">#FFFFFFFF</color>
+    
+    <!-- 背景颜色 -->
+    <color name="background">#FFF2F2F7</color>
+    <color name="on_background">#FF1C1C1E</color>
+    
+    <color name="surface">#FFFFFFFF</color>
+    <color name="on_surface">#FF1C1C1E</color>
+    <color name="surface_variant">#FFF2F2F7</color>
+    <color name="on_surface_variant">#FF8E8E93</color>
+    
+    <!-- 状态颜色 -->
+    <color name="success">#FF34C759</color>
+    <color name="warning">#FFFF9500</color>
+    <color name="info">#FF007AFF</color>
+    
+    <!-- 文本颜色 -->
+    <color name="text_primary">#FF1C1C1E</color>
+    <color name="text_secondary">#FF8E8E93</color>
+    <color name="text_tertiary">#FFAEAEB2</color>
+    
+    <!-- 分割线颜色 -->
+    <color name="divider">#FFE5E5EA</color>
+    <color name="divider_dark">#FF38383A</color>
+    
+    <!-- 暗色主题颜色 -->
+    <color name="dark_background">#FF000000</color>
+    <color name="dark_on_background">#FFF2F2F7</color>
+    
+    <color name="dark_surface">#FF1C1C1E</color>
+    <color name="dark_on_surface">#FFF2F2F7</color>
+    <color name="dark_surface_variant">#FF2C2C2E</color>
+    <color name="dark_on_surface_variant">#FF8E8E93</color>
+    
+    <color name="dark_text_primary">#FFF2F2F7</color>
+    <color name="dark_text_secondary">#FF8E8E93</color>
+    <color name="dark_text_tertiary">#FF636366</color>
+    
+    <!-- 渐变颜色 -->
+    <color name="gradient_start">#FF007AFF</color>
+    <color name="gradient_end">#FF5856D6</color>
+    
+    <!-- 卡片颜色 -->
+    <color name="card_light">#FFFFFFFF</color>
+    <color name="card_dark">#FF2C2C2E</color>
+    
+    <!-- 阴影颜色 -->
+    <color name="shadow_light">#1A000000</color>
+    <color name="shadow_dark">#1AFFFFFF</color>
+</resources>
