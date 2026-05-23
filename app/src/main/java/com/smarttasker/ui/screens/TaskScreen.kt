@@ -39,41 +39,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.smarttasker.ui.components.TaskItem
-import com.smarttasker.ui.components.ScriptItem
-
-// 任务分类
-enum class TaskCategory(val title: String) {
-    TASKS("任务管理"),
-    SCRIPTS("脚本管理")
-}
-
-// 任务数据
-data class Task(
-    val id: String,
-    val name: String,
-    val description: String,
-    val type: TaskType,
-    val isEnabled: Boolean,
-    val lastRunTime: String?
-)
-
-// 任务类型
-enum class TaskType(val title: String) {
-    SINGLE("单次任务"),
-    SCHEDULED("定时任务"),
-    TRIGGERED("触发任务")
-}
-
-// 脚本数据
-data class Script(
-    val id: String,
-    val name: String,
-    val description: String,
-    val category: String,
-    val stepCount: Int,
-    val lastModified: String
-)
+import com.smarttasker.model.ScriptItem
+import com.smarttasker.model.TaskItem
+import com.smarttasker.model.TaskType
+import com.smarttasker.ui.components.ScriptCard
+import com.smarttasker.ui.components.TaskCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,7 +75,6 @@ fun TaskScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 任务管理部分
             item {
                 SectionHeader(
                     title = "任务管理",
@@ -114,7 +83,7 @@ fun TaskScreen(
             }
             
             items(uiState.tasks) { task ->
-                TaskItem(
+                TaskCard(
                     task = task,
                     onRun = { viewModel.runTask(task.id) },
                     onEdit = { viewModel.editTask(task.id) },
@@ -122,7 +91,6 @@ fun TaskScreen(
                 )
             }
             
-            // 脚本管理部分
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 SectionHeader(
@@ -132,7 +100,7 @@ fun TaskScreen(
             }
             
             items(uiState.scripts) { script ->
-                ScriptItem(
+                ScriptCard(
                     script = script,
                     onRun = { viewModel.runScript(script.id) },
                     onEdit = { viewModel.editScript(script.id) },
@@ -140,7 +108,6 @@ fun TaskScreen(
                 )
             }
             
-            // 快速创建
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 QuickCreateCard(
@@ -149,7 +116,6 @@ fun TaskScreen(
                 )
             }
             
-            // 底部间距
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -158,10 +124,7 @@ fun TaskScreen(
 }
 
 @Composable
-fun SectionHeader(
-    title: String,
-    onAddClick: () -> Unit
-) {
+fun SectionHeader(title: String, onAddClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,10 +150,7 @@ fun SectionHeader(
 }
 
 @Composable
-fun QuickCreateCard(
-    onCreateTask: () -> Unit,
-    onCreateScript: () -> Unit
-) {
+fun QuickCreateCard(onCreateTask: () -> Unit, onCreateScript: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(

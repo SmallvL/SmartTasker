@@ -36,10 +36,10 @@ data class TaskEntity(
 /**
  * 任务类型
  */
-enum class TaskType {
-    SINGLE,      // 单次任务
-    SCHEDULED,   // 定时任务
-    TRIGGERED    // 触发任务
+enum class TaskType(val title: String) {
+    SINGLE("单次任务"),
+    SCHEDULED("定时任务"),
+    TRIGGERED("触发任务")
 }
 
 /**

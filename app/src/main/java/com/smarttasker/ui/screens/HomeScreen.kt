@@ -52,26 +52,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.smarttasker.ui.components.StatusCard
+import com.smarttasker.model.GuideStep
 import com.smarttasker.ui.components.StepItem
+import com.smarttasker.model.HomeUiState
+import com.smarttasker.model.ServiceStatus
 import com.smarttasker.ui.theme.AppColors
-
-// 引导步骤数据
-data class GuideStep(
-    val id: Int,
-    val title: String,
-    val description: String,
-    val isCompleted: Boolean,
-    val isCurrent: Boolean
-)
-
-// 服务状态数据
-data class ServiceStatus(
-    val isRunning: Boolean,
-    val isPaired: Boolean,
-    val isConnected: Boolean,
-    val message: String
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,7 +88,6 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 服务状态卡片
             item {
                 ServiceStatusCard(
                     status = uiState.serviceStatus,
@@ -112,7 +96,6 @@ fun HomeScreen(
                 )
             }
             
-            // 引导步骤
             item {
                 Text(
                     text = "快速设置",
@@ -129,7 +112,6 @@ fun HomeScreen(
                 )
             }
             
-            // 进度指示器
             item {
                 val completedSteps = uiState.guideSteps.count { it.isCompleted }
                 val totalSteps = uiState.guideSteps.size
@@ -160,7 +142,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     LinearProgressIndicator(
-                        progress = { progress },
+                        progress = progress,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
@@ -171,7 +153,6 @@ fun HomeScreen(
                 }
             }
             
-            // 快速操作
             item {
                 Text(
                     text = "快速操作",
@@ -188,7 +169,6 @@ fun HomeScreen(
                 )
             }
             
-            // 底部间距
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -237,7 +217,6 @@ fun ServiceStatusCard(
                     )
                 }
                 
-                // 状态指示器
                 Box(
                     modifier = Modifier
                         .size(12.dp)
@@ -250,28 +229,17 @@ fun ServiceStatusCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // 状态详情
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                StatusItem(
-                    label = "运行",
-                    isActive = status.isRunning
-                )
-                StatusItem(
-                    label = "配对",
-                    isActive = status.isPaired
-                )
-                StatusItem(
-                    label = "连接",
-                    isActive = status.isConnected
-                )
+                StatusItem(label = "运行", isActive = status.isRunning)
+                StatusItem(label = "配对", isActive = status.isPaired)
+                StatusItem(label = "连接", isActive = status.isConnected)
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // 操作按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -315,13 +283,8 @@ fun ServiceStatusCard(
 }
 
 @Composable
-fun StatusItem(
-    label: String,
-    isActive: Boolean
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+fun StatusItem(label: String, isActive: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -346,20 +309,13 @@ fun StatusItem(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (isActive) {
-                AppColors.success
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
+            color = if (isActive) AppColors.success else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
-fun QuickActionsCard(
-    onTestConnection: () -> Unit,
-    onRunSampleTask: () -> Unit
-) {
+fun QuickActionsCard(onTestConnection: () -> Unit, onRunSampleTask: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
