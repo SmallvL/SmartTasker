@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="#E6222222"
+    android:padding="8dp"
+    android:gravity="center_vertical"
+    android:elevation="8dp">
+
+    <!-- REC indicator -->
+    <TextView
+        android:id="@+id/rec_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="● REC"
+        android:textColor="#FFFF4444"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:paddingEnd="8dp" />
+
+    <!-- Step count -->
+    <TextView
+        android:id="@+id/rec_step_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 步"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:paddingEnd="8dp" />
+
+    <!-- Timer -->
+    <TextView
+        android:id="@+id/rec_timer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="00:00"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:paddingEnd="12dp" />
+
+    <!-- Pause button -->
+    <TextView
+        android:id="@+id/rec_pause"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:text="暂停"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:background="#33FFFFFF"
+        android:paddingHorizontal="10dp"
+        android:layout_marginEnd="4dp" />
+
+    <!-- Wait button -->
+    <TextView
+        android:id="@+id/rec_wait"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:text="等待"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:background="#33FFFFFF"
+        android:paddingHorizontal="10dp"
+        android:layout_marginEnd="4dp" />
+
+    <!-- Screenshot button -->
+    <TextView
+        android:id="@+id/rec_screenshot"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:text="截图"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:background="#33FFFFFF"
+        android:paddingHorizontal="10dp"
+        android:layout_marginEnd="4dp" />
+
+    <!-- Stop button -->
+    <TextView
+        android:id="@+id/rec_stop"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:text="■ 停止"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:background="#FFFF4444"
+        android:paddingHorizontal="10dp" />
+
+</LinearLayout>

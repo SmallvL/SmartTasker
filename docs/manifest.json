@@ -1,0 +1,20 @@
+{
+  "project": "SmartTask AI / AI Android Automation",
+  "version": "0.2",
+  "date": "2026-05-23",
+  "files": [
+    "00_AGENT_README_总览.md",
+    "01_PRODUCT_MVP_PRD.md",
+    "02_UI_UX_OPENAI_STYLE_GUIDE.md",
+    "03_TECH_ARCH_AUTOLXB_INTEGRATION.md",
+    "04_ROUTE_STUDIO_SPEC.md",
+    "05_AI_TASK_WIZARD_AND_PROMPTS.md",
+    "06_DATA_SCHEMA_AND_API_CONTRACTS.md",
+    "07_SECURITY_PERMISSION_COST.md",
+    "08_DEV_PLAN_PROGRESS_MANAGEMENT.md",
+    "09_TEST_ACCEPTANCE_RISK.md",
+    "10_BACKLOG_ISSUES.md",
+    "README_文档包说明.md"
+  ],
+  "recommended_entry": "00_AGENT_README_总览.md"
+}

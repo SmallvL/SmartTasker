@@ -1,160 +1,310 @@
 package com.smarttasker.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
 import android.content.Context
-import android.content.Intent
-import android.os.Build
-import android.os.IBinder
-import android.util.Log
-import androidx.core.app.NotificationCompat
-import com.smarttasker.R
-import com.smarttasker.SmartTaskerApp
-import com.smarttasker.ui.MainActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+import com.smarttasker.core.bridge.*
+import com.smarttasker.core.parser.TaskSpec
+import com.smarttasker.core.adapter.RouteAdapter
+import com.smarttasker.core.adapter.TraceAdapter
+import com.smarttasker.data.entity.RouteStepEntity
+import com.smarttasker.data.entity.RunRecordEntity
+import com.smarttasker.data.repository.RouteRepository
+import com.smarttasker.data.repository.RunRepository
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 
 /**
- * 任务执行前台服务
+ * Service that orchestrates task execution through CoreBridge.
+ * Handles: submit → monitor → collect route/trace → save.
  */
-class TaskExecutionService : Service() {
+class TaskExecutionService(
+    private val context: Context,
+    private val routeRepository: RouteRepository,
+    private val runRepository: RunRepository
+) {
+    private val manager = CoreBridgeManager.getInstance(context)
+    private val bridge: CoreBridge get() = manager.bridge
     
-    companion object {
-        private const val TAG = "TaskExecService"
-        private const val NOTIFICATION_ID = 1001
-        
-        const val ACTION_START_TASK = "com.smarttasker.START_TASK"
-        const val ACTION_STOP_TASK = "com.smarttasker.STOP_TASK"
-        const val ACTION_STOP_SERVICE = "com.smarttasker.STOP_SERVICE"
-        const val EXTRA_TASK_ID = "task_id"
-        
-        private val _isRunning = MutableStateFlow(false)
-        val isRunning: StateFlow<Boolean> = _isRunning
-        
-        private val _taskStatus = MutableStateFlow("")
-        val taskStatus: StateFlow<String> = _taskStatus
-        
-        fun startService(context: Context) {
-            val intent = Intent(context, TaskExecutionService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+    // ===== Execution State =====
+    
+    private val _executionState = MutableStateFlow<ExecutionState>(ExecutionState.Idle)
+    val executionState: StateFlow<ExecutionState> = _executionState.asStateFlow()
+    
+    private var monitorJob: Job? = null
+    
+    /**
+     * Execute a quick task (trial run).
+     * Flow: submit → monitor status → on success, collect route → save
+     */
+    suspend fun executeQuickTask(taskSpec: TaskSpec): ExecutionResult {
+        var result: ExecutionResult
+        try {
+            // Build payload FIRST (before any state changes that trigger recomposition)
+            val payload = try {
+                buildTaskPayload(taskSpec)
+            } catch (e: Exception) {
+                _executionState.value = ExecutionState.Error("构建任务参数失败: ${e.message}")
+                return ExecutionResult.Error("构建任务参数失败: ${e.message}")
             }
-        }
-        
-        fun stopService(context: Context) {
-            val intent = Intent(context, TaskExecutionService::class.java)
-            context.stopService(intent)
-        }
-    }
-    
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var taskEngine: TaskExecutionEngine? = null
-    
-    override fun onBind(intent: Intent?): IBinder? = null
-    
-    override fun onCreate() {
-        super.onCreate()
-        _isRunning.value = true
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification("服务运行中"))
-        Log.d(TAG, "服务创建")
-    }
-    
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START_TASK -> {
-                val taskId = intent.getStringExtra(EXTRA_TASK_ID)
-                if (taskId != null) {
-                    startTask(taskId)
+
+            // NOW set submitting state (triggers recomposition)
+            _executionState.value = ExecutionState.Submitting
+
+            val submitResult = try {
+                bridge.submitQuickTask(payload)
+            } catch (e: Exception) {
+                _executionState.value = ExecutionState.Error("提交失败: ${e.message}")
+                return ExecutionResult.Error("提交失败: ${e.message}")
+            }
+
+            val (taskId, runId) = when (submitResult) {
+                is TaskSubmitResult.Accepted -> Pair(submitResult.taskId, submitResult.runId)
+                is TaskSubmitResult.Error -> {
+                    _executionState.value = ExecutionState.Error(submitResult.message)
+                    return ExecutionResult.Error(submitResult.message)
                 }
             }
-            ACTION_STOP_TASK -> {
-                stopTask()
-            }
-            ACTION_STOP_SERVICE -> {
-                stopSelf()
-            }
-        }
-        
-        return START_STICKY
-    }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        _isRunning.value = false
-        serviceScope.cancel()
-        Log.d(TAG, "服务销毁")
-    }
-    
-    private fun startTask(taskId: String) {
-        serviceScope.launch {
-            try {
-                _taskStatus.value = "正在执行任务..."
-                updateNotification("正在执行任务: $taskId")
-                
-                _taskStatus.value = "任务执行完成"
-                updateNotification("任务执行完成")
-            } catch (e: Exception) {
-                Log.e(TAG, "任务执行失败", e)
-                _taskStatus.value = "任务执行失败: ${e.message}"
-                updateNotification("任务执行失败")
-            }
-        }
-    }
-    
-    private fun stopTask() {
-        taskEngine?.stop()
-        _taskStatus.value = "任务已停止"
-        updateNotification("任务已停止")
-    }
-    
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                SmartTaskerApp.NOTIFICATION_CHANNEL_ID,
-                SmartTaskerApp.NOTIFICATION_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = SmartTaskerApp.NOTIFICATION_CHANNEL_DESCRIPTION
-                setShowBadge(false)
-            }
+
+            _executionState.value = ExecutionState.Running(taskId = taskId, phase = "执行中", progress = 0f)
             
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
+            val finalStatus = pollUntilDone(taskId)
+            
+            result = when (finalStatus.state) {
+                "success" -> {
+                    _executionState.value = ExecutionState.Completed(taskId)
+                    
+                    val route = collectRoute(taskId)
+                    val trace = collectTrace(taskId)
+                    val parsedRoute = route?.let { RouteAdapter.parseRoute(it, taskId) }
+                    val steps = parsedRoute?.steps ?: emptyList()
+                    
+                    val runRecord = RunRecordEntity(
+                        runId = runId,
+                        taskId = taskId,
+                        status = "success",
+                        diagnosisSummary = "试跑成功",
+                        diagnosisSuggestion = "路线已学习，可复用",
+                        modelCalls = 0,
+                        routeSnapshot = route ?: ""
+                    )
+                    runRepository.insertRun(runRecord)
+                    
+                    ExecutionResult.Success(
+                        taskId = taskId,
+                        routeJson = route,
+                        steps = steps,
+                        traceLines = trace ?: emptyList()
+                    )
+                }
+                "failed" -> {
+                    _executionState.value = ExecutionState.Error(finalStatus.detail)
+                    
+                    val trace = collectTrace(taskId)
+                    val parsedTrace = TraceAdapter.parseTrace(trace ?: emptyList(), taskId, runId)
+                    val diagnosis = Pair(parsedTrace.runRecord.diagnosisSummary, parsedTrace.runRecord.diagnosisSuggestion)
+                    
+                    val runRecord = RunRecordEntity(
+                        runId = runId,
+                        taskId = taskId,
+                        status = "failed",
+                        diagnosisSummary = diagnosis.first,
+                        diagnosisSuggestion = diagnosis.second,
+                        modelCalls = 0,
+                        routeSnapshot = ""
+                    )
+                    runRepository.insertRun(runRecord)
+                    
+                    ExecutionResult.Failed(
+                        taskId = taskId,
+                        reason = finalStatus.detail,
+                        traceLines = trace ?: emptyList(),
+                        diagnosis = diagnosis
+                    )
+                }
+                "cancelled" -> {
+                    _executionState.value = ExecutionState.Idle
+                    ExecutionResult.Cancelled
+                }
+                else -> {
+                    _executionState.value = ExecutionState.Error("未知状态: ${finalStatus.state}")
+                    ExecutionResult.Error("未知状态: ${finalStatus.state}")
+                }
+            }
+        } catch (e: Exception) {
+            _executionState.value = ExecutionState.Error(e.message ?: "未知异常")
+            result = ExecutionResult.Error(e.message ?: "未知异常")
+        }
+        return result
+    }
+    
+    /**
+     * Execute a saved route (replay mode).
+     */
+    suspend fun executeSavedRoute(
+        taskId: String,
+        routeSteps: List<RouteStepEntity>
+    ): ExecutionResult {
+        _executionState.value = ExecutionState.Running(taskId, "回放路线", 0f)
+        
+        // Convert steps back to AutoLXB route JSON
+        val routeJson = RouteAdapter.toRouteJson(routeSteps)
+        
+        val result = bridge.runRoute(taskId, routeJson)
+        return when (result) {
+            is RouteRunResult.Success -> {
+                _executionState.value = ExecutionState.Completed(taskId)
+                ExecutionResult.Success(
+                    taskId = taskId,
+                    routeJson = routeJson,
+                    steps = routeSteps,
+                    traceLines = emptyList()
+                )
+            }
+            is RouteRunResult.Failed -> {
+                _executionState.value = ExecutionState.Error("步骤 ${result.stepIndex}: ${result.reason}")
+                ExecutionResult.Failed(
+                    taskId = taskId,
+                    reason = "步骤 ${result.stepIndex}: ${result.reason}",
+                    traceLines = emptyList(),
+                    diagnosis = Pair("路线执行失败", result.reason)
+                )
+            }
+            is RouteRunResult.Error -> {
+                _executionState.value = ExecutionState.Error(result.message)
+                ExecutionResult.Error(result.message)
+            }
         }
     }
     
-    private fun createNotification(text: String): Notification {
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        return NotificationCompat.Builder(this, SmartTaskerApp.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("SmartTasker")
-            .setContentText(text)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .build()
+    /**
+     * Cancel the current execution.
+     */
+    suspend fun cancelExecution(taskId: String) {
+        monitorJob?.cancel()
+        bridge.cancelTask(taskId)
+        _executionState.value = ExecutionState.Idle
     }
     
-    private fun updateNotification(text: String) {
-        val notification = createNotification(text)
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, notification)
+    // ===== Private Helpers =====
+    
+    private suspend fun pollUntilDone(taskId: String): TaskStatusResult.Status {
+        return withTimeoutOrNull(120_000L) { // 2 min timeout
+            while (true) {
+                when (val result = bridge.getTaskStatus(taskId)) {
+                    is TaskStatusResult.Status -> {
+                        _executionState.value = ExecutionState.Running(
+                            taskId = taskId,
+                            phase = result.phase,
+                            progress = estimateProgress(result.phase)
+                        )
+                        if (result.state in listOf("success", "failed", "cancelled")) {
+                            return@withTimeoutOrNull result
+                        }
+                    }
+                    is TaskStatusResult.Error -> {
+                        return@withTimeoutOrNull TaskStatusResult.Status(
+                            taskId = taskId,
+                            state = "failed",
+                            phase = "error",
+                            detail = result.message
+                        )
+                    }
+                }
+                delay(1000) // Poll every second
+            }
+            @Suppress("UNREACHABLE_CODE")
+            TaskStatusResult.Status(taskId, "failed", "timeout", "执行超时")
+        } ?: TaskStatusResult.Status(taskId, "failed", "timeout", "执行超时 (2分钟)")
     }
+    
+    private suspend fun collectRoute(taskId: String): String? {
+        return when (val result = bridge.getLatestRoute(taskId)) {
+            is RouteResult.Found -> result.routeJson
+            else -> null
+        }
+    }
+    
+    private suspend fun collectTrace(taskId: String): List<String>? {
+        return when (val result = bridge.getLatestTrace(taskId)) {
+            is TraceResult.Found -> result.traceLines
+            else -> null
+        }
+    }
+    
+    private fun buildTaskPayload(spec: TaskSpec): String {
+        // Manual JSON to avoid any JSONObject issues on some devices
+        val sb = StringBuilder(256)
+        sb.append('{')
+        sb.append("\"type\":\"quick\"")
+        sb.append(",\"name\":").append(jsonEscape(spec.name))
+        sb.append(",\"description\":").append(jsonEscape(spec.description ?: ""))
+        sb.append(",\"playbook\":").append(jsonEscape(spec.playbook ?: ""))
+        sb.append(",\"execution_mode\":").append(jsonEscape(spec.execution.mode))
+        sb.append(",\"route_enabled\":").append(spec.execution.routeEnabled)
+
+        // target_app
+        sb.append(",\"target_app\":{")
+        sb.append("\"name\":").append(jsonEscape(spec.targetApp?.name ?: ""))
+        sb.append(",\"package\":").append(jsonEscape(spec.targetApp?.packageName ?: ""))
+        sb.append(",\"confidence\":").append(spec.targetApp?.confidence ?: 0f)
+        sb.append('}')
+
+        // trigger
+        sb.append(",\"trigger\":{")
+        sb.append("\"type\":").append(jsonEscape(spec.trigger.type))
+        sb.append(",\"time\":").append(jsonEscape(spec.trigger.time ?: ""))
+        sb.append(",\"repeat\":").append(jsonEscape(spec.trigger.repeat ?: "once"))
+        sb.append('}')
+
+        sb.append('}')
+        return sb.toString()
+    }
+
+    private fun jsonEscape(s: String): String {
+        val escaped = s
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        return "\"$escaped\""
+    }
+    
+    private fun estimateProgress(phase: String): Float = when (phase) {
+        "analyzing" -> 0.1f
+        "launching" -> 0.2f
+        "navigating" -> 0.5f
+        "interacting" -> 0.7f
+        "verifying" -> 0.9f
+        "completed" -> 1.0f
+        else -> 0.3f
+    }
+}
+
+// ===== State & Result Types =====
+
+sealed class ExecutionState {
+    object Idle : ExecutionState()
+    object Submitting : ExecutionState()
+    data class Running(val taskId: String, val phase: String, val progress: Float) : ExecutionState()
+    data class Completed(val taskId: String) : ExecutionState()
+    data class Error(val message: String) : ExecutionState()
+}
+
+sealed class ExecutionResult {
+    data class Success(
+        val taskId: String,
+        val routeJson: String?,
+        val steps: List<RouteStepEntity>,
+        val traceLines: List<String>
+    ) : ExecutionResult()
+    
+    data class Failed(
+        val taskId: String,
+        val reason: String,
+        val traceLines: List<String>,
+        val diagnosis: Pair<String, String>
+    ) : ExecutionResult()
+    
+    object Cancelled : ExecutionResult()
+    data class Error(val message: String) : ExecutionResult()
 }

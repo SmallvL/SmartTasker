@@ -34,6 +34,9 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- 悬浮窗权限（录制控制条） -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:name=".SmartTaskerApp"
         android:allowBackup="true"
@@ -47,7 +50,7 @@
 
         <!-- 主界面 -->
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.SmartTasker"
             android:windowSoftInputMode="adjustResize">
@@ -69,12 +72,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
-
-        <!-- 前台服务 -->
-        <service
-            android:name=".service.TaskExecutionService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
 
         <!-- 定时任务接收器 -->
         <receiver
@@ -100,6 +97,24 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- ADB 配对前台服务 -->
+        <service
+            android:name=".service.AdbPairingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 任务运行前台服务 -->
+        <service
+            android:name=".service.TaskRuntimeService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 录制悬浮控制条前台服务 -->
+        <service
+            android:name=".core.record.ui.RecordingOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 
