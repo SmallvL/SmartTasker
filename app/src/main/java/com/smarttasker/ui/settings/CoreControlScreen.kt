@@ -273,14 +273,12 @@ fun CoreControlScreen(
                     text = "使用 Root 模式",
                     onClick = {
                         scope.launch {
-                            ShellExecutor.resetCache()
-                            val mode = ShellExecutor.detectMode()
-                            if (mode == ShellExecutor.ShellMode.ROOT) {
-                                coreBridgeManager.useDirectBridge()
-                                coreBridgeManager.refreshStatus()
+                            coreBridgeManager.forceResetAndRefresh()
+                            delay(300)
+                            coreBridgeManager.deviceStatusChecker.checkAll()
+                            if (ShellExecutor.detectMode() == ShellExecutor.ShellMode.ROOT) {
                                 actionResult = Pair(true, "Root 模式已就绪")
                             }
-                            coreBridgeManager.deviceStatusChecker.checkAll()
                         }
                     },
                     icon = Icons.Outlined.Security
@@ -362,11 +360,9 @@ private suspend fun connectToSavedEndpoint(
                 if (port > 0) {
                     for (attempt in 1..2) {
                         try {
-                            ShellExecutor.resetCache()
                             val connected = ShellExecutor.connectAdb(host, port)
                             DebugLog.i("CoreCtrl", "Direct attempt $attempt: $connected")
                             if (connected) {
-                                coreBridgeManager.useDirectBridge()
                                 coreBridgeManager.refreshStatus()
                                 onResult(true, "ADB 连接成功 ($host:$port)")
                                 return@withTimeout
@@ -381,11 +377,9 @@ private suspend fun connectToSavedEndpoint(
                 // Phase 2: NSD autoConnect fallback (works even if port changed)
                 DebugLog.i("CoreCtrl", "Direct connect failed, trying NSD autoConnect...")
                 try {
-                    ShellExecutor.resetCache()
                     val autoConnected = ShellExecutor.connectAdb(host, 0) // port=0 → autoConnect
                     DebugLog.i("CoreCtrl", "NSD autoConnect result: $autoConnected")
                     if (autoConnected) {
-                        coreBridgeManager.useDirectBridge()
                         coreBridgeManager.refreshStatus()
                         onResult(true, "ADB 自动发现连接成功")
                         return@withTimeout
