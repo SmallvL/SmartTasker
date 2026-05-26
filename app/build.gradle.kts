@@ -15,7 +15,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -25,8 +25,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -64,6 +64,11 @@ android {
 }
 
 dependencies {
+    // Network
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    
+    // JSON
+    implementation("org.json:json:20231013")
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
@@ -107,6 +112,13 @@ dependencies {
     // JSON
     implementation("org.json:json:20231013")
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // ADB
+    implementation("com.github.MuntashirAkon:libadb-android:master-SNAPSHOT")
+    // Bouncy Castle (for ADB TLS certificate generation)
+    implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
+    // Conscrypt TLS provider (fixes exportKeyingMaterial on some devices)
+    implementation("org.conscrypt:conscrypt-android:2.5.2")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
