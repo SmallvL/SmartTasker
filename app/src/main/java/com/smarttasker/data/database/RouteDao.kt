@@ -45,4 +45,10 @@ interface RouteDao {
 
     @Query("DELETE FROM route_steps WHERE routeId = :routeId")
     suspend fun deleteAllSteps(routeId: String)
+
+    @Query("DELETE FROM route_versions WHERE routeId = :routeId")
+    suspend fun deleteRouteVersion(routeId: String)
+
+    @Query("UPDATE route_steps SET stepIndex = :newIndex WHERE stepId = :stepId")
+    suspend fun reindexStep(stepId: String, newIndex: Int)
 }

@@ -125,6 +125,26 @@ class RouteRepository(private val dao: RouteDao) {
     suspend fun toggleStepEnabled(step: RouteStepEntity) = dao.updateStep(step.copy(enabled = !step.enabled))
     suspend fun toggleStepLocked(step: RouteStepEntity) = dao.updateStep(step.copy(lockedByUser = !step.lockedByUser))
 
+    /**
+     * Delete route version and all its steps.
+     */
+    suspend fun deleteRoute(routeId: String) {
+        dao.deleteAllSteps(routeId)
+        dao.deleteRouteVersion(routeId)
+    }
+
+    /**
+     * Re-sequence step indices after deletion/reorder.
+     */
+    suspend fun reindexSteps(routeId: String) {
+        val steps = dao.getStepsForRouteSync(routeId)
+        steps.forEachIndexed { index, step ->
+            if (step.stepIndex != index + 1) {
+                dao.reindexStep(step.stepId, index + 1)
+            }
+        }
+    }
+
     // ===== Conversion helpers =====
 
     private data class StepInfo(

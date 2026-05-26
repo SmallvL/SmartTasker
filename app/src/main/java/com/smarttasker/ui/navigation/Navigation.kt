@@ -376,6 +376,11 @@ fun MainNavigation(
                         routeRepo = routeRepo,
                         onSaveAndEnable = {
                             scope.launch {
+                                // Publish route first
+                                val route = routeRepo.getRouteById(routeId)
+                                if (route != null) {
+                                    routeRepo.publishRoute(route)
+                                }
                                 taskRepo.activateTask(task!!)
                                 navController.navigate(Screen.Home.route) { popUpTo(Screen.Home.route) { inclusive = true } }
                             }
@@ -383,7 +388,15 @@ fun MainNavigation(
                         onOpenRouteStudio = { rid ->
                             navController.navigate("route_studio/$rid/${task!!.taskId}?taskName=${java.net.URLEncoder.encode(task!!.name, "UTF-8")}")
                         },
-                        onDiscard = { navController.popBackStack() }
+                        onDiscard = {
+                            scope.launch {
+                                // Clean up DB
+                                if (routeId.isNotEmpty()) {
+                                    routeRepo.deleteRoute(routeId)
+                                }
+                                navController.popBackStack()
+                            }
+                        }
                     )
                 }
             }

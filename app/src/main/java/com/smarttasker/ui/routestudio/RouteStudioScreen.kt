@@ -57,9 +57,16 @@ fun RouteStudioScreen(
     var isTestingRoute by remember { mutableStateOf(false) }
     var isTestingStep by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
+    var isPublished by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val screenshotManager = remember { ScreenshotManager(context) }
+
+    // Load publish state
+    LaunchedEffect(routeId) {
+        val route = routeRepo.getRouteById(routeId)
+        isPublished = route?.status == "published"
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -69,7 +76,11 @@ fun RouteStudioScreen(
                 title = {
                     Column {
                         Text(taskName, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                        Text("路线编辑器 · ${steps.size} 步", fontSize = 12.sp, color = SmartColors.textSecondary())
+                        Text(
+                            "路线编辑器 · ${steps.size} 步" + if (isPublished) " · 已发布" else " · 草稿",
+                            fontSize = 12.sp,
+                            color = if (isPublished) SmartColors.success() else SmartColors.textSecondary()
+                        )
                     }
                 },
                 navigationIcon = {
@@ -105,18 +116,27 @@ fun RouteStudioScreen(
                         Text("测试")
                     }
                     // Publish
-                    TextButton(onClick = {
-                        coroutineScope.launch {
-                            val route = routeRepo.getRouteById(routeId)
-                            if (route != null) {
-                                routeRepo.publishRoute(route)
-                                snackbarHostState.showSnackbar("路线已发布")
+                    TextButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                val route = routeRepo.getRouteById(routeId)
+                                if (route != null) {
+                                    routeRepo.publishRoute(route)
+                                    isPublished = true
+                                    snackbarHostState.showSnackbar("路线已发布")
+                                }
                             }
-                        }
-                    }) {
-                        Icon(Icons.Outlined.Publish, null, modifier = Modifier.size(18.dp))
+                        },
+                        enabled = !isPublished
+                    ) {
+                        Icon(
+                            if (isPublished) Icons.Outlined.CheckCircle else Icons.Outlined.Publish,
+                            null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (isPublished) SmartColors.success() else LocalContentColor.current
+                        )
                         Spacer(Modifier.width(4.dp))
-                        Text("发布")
+                        Text(if (isPublished) "已发布" else "发布")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -216,7 +236,13 @@ fun RouteStudioScreen(
                     onClick = {
                         coroutineScope.launch {
                             routeRepo.deleteStep(step)
+                            routeRepo.reindexSteps(routeId)
                             showDeleteConfirm = null
+                            // Clear selection if deleted step was selected
+                            if (selectedStep?.stepId == step.stepId) {
+                                selectedStep = null
+                                showStepEditor = false
+                            }
                             snackbarHostState.showSnackbar("已删除")
                         }
                     },

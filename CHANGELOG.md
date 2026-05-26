@@ -24,6 +24,22 @@
 
 ---
 
+## [0.1.2] — 2026-05-26
+
+### Fixed
+- **保存并启用**：现在会先 `publishRoute()` 再激活任务（之前只激活 task 未发布路线）
+- **放弃路线**：离开学习结果页时清理 DB（`deleteRoute()` 删除版本+步骤）
+- **删除步骤重排序**：删除后自动 `reindexSteps()`，stepIndex 保持连续
+- **删除已选中步骤**：自动关闭详情面板，避免显示已删除步骤
+
+### Changed
+- **发布按钮状态**：发布后按钮变为「✅ 已发布」绿色禁用态
+- **路线状态指示**：TopAppBar 副标题显示「草稿」/「已发布」
+- `RouteRepository` 新增 `deleteRoute()`, `reindexSteps()` 方法
+- `RouteDao` 新增 `deleteRouteVersion()`, `reindexStep()` 查询
+
+---
+
 ## [0.1.0] — 2026-05-26
 
 ### Added
