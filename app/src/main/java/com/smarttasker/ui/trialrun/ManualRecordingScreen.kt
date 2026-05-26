@@ -54,19 +54,25 @@ fun ManualRecordingScreen(
         }
     }
 
-    // Load saved route when recording stops
+    // Load saved route when recording stops — poll up to 10s for file to appear
     LaunchedEffect(recordingStopped) {
         if (recordingStopped) {
-            // Wait a bit for the save to complete
-            kotlinx.coroutines.delay(1000)
             val store = com.smarttasker.core.record.RouteDraftStore(context)
-            val drafts = store.listAll()
-            if (drafts.isNotEmpty()) {
-                routeDraft = drafts.first()
-                recordedSteps = routeDraft?.steps ?: emptyList()
-                DebugLog.i("ManualRec", "Loaded route with ${recordedSteps.size} steps")
-            } else {
-                DebugLog.e("ManualRec", "No routes found after recording")
+            var attempts = 0
+            var loaded = false
+            while (attempts < 20 && !loaded) { // 20 * 500ms = 10s max
+                kotlinx.coroutines.delay(500)
+                val drafts = store.listAll()
+                if (drafts.isNotEmpty()) {
+                    routeDraft = drafts.first()
+                    recordedSteps = routeDraft?.steps ?: emptyList()
+                    DebugLog.i("ManualRec", "Loaded route with ${recordedSteps.size} steps")
+                    loaded = true
+                }
+                attempts++
+            }
+            if (!loaded) {
+                DebugLog.e("ManualRec", "Route file not found after ${attempts * 500}ms")
             }
         }
     }

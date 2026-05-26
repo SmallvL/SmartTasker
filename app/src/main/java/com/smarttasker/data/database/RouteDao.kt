@@ -49,6 +49,12 @@ interface RouteDao {
     @Query("DELETE FROM route_versions WHERE routeId = :routeId")
     suspend fun deleteRouteVersion(routeId: String)
 
+    @androidx.room.Transaction
+    suspend fun replaceAllSteps(routeId: String, steps: List<RouteStepEntity>) {
+        deleteAllSteps(routeId)
+        insertSteps(steps)
+    }
+
     @Query("UPDATE route_steps SET stepIndex = :newIndex WHERE stepId = :stepId")
     suspend fun reindexStep(stepId: String, newIndex: Int)
 }

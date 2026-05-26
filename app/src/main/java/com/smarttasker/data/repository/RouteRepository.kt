@@ -57,8 +57,7 @@ class RouteRepository(private val dao: RouteDao) {
             recordedStepToEntity(step, routeId, index + 1)
         }
         if (steps.isNotEmpty()) {
-            dao.deleteAllSteps(routeId) // Clear existing before insert
-            dao.insertSteps(steps)
+            dao.replaceAllSteps(routeId, steps) // Atomic transaction
         }
 
         return routeId

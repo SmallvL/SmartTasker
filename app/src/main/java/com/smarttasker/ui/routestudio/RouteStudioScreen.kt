@@ -192,7 +192,11 @@ fun RouteStudioScreen(
                     StepDetailPanel(
                         step = selectedStep!!,
                         screenshotManager = screenshotManager,
-                        onEdit = { /* TODO: open full editor */ },
+                        onEdit = {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("编辑功能即将上线")
+                            }
+                        },
                         onSingleStepTest = {
                             coroutineScope.launch {
                                 isTestingStep = true
@@ -508,13 +512,13 @@ private fun StepDetailPanel(
     onLocatorChange: (strategy: String, value: String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var showWaitTimeEditor by remember { mutableStateOf(false) }
-    var showLocatorEditor by remember { mutableStateOf(false) }
-    var waitTimeText by remember { mutableStateOf((step.waitTimeMs / 1000).toString()) }
-    var locatorStrategy by remember { mutableStateOf(step.locatorStrategy) }
-    var locatorValue by remember { mutableStateOf(step.locatorValue) }
-    var screenshotBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var screenshotSize by remember { mutableStateOf(IntSize.Zero) }
+    var showWaitTimeEditor by remember(step.stepId) { mutableStateOf(false) }
+    var showLocatorEditor by remember(step.stepId) { mutableStateOf(false) }
+    var waitTimeText by remember(step.stepId) { mutableStateOf((step.waitTimeMs / 1000).toString()) }
+    var locatorStrategy by remember(step.stepId) { mutableStateOf(step.locatorStrategy) }
+    var locatorValue by remember(step.stepId) { mutableStateOf(step.locatorValue) }
+    var screenshotBitmap by remember(step.stepId) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var screenshotSize by remember(step.stepId) { mutableStateOf(IntSize.Zero) }
     val coroutineScope = rememberCoroutineScope()
 
     // Parse tap coordinates for overlay
@@ -522,17 +526,16 @@ private fun StepDetailPanel(
 
     // Load screenshot when panel opens
     LaunchedEffect(step.stepId) {
-        coroutineScope.launch(Dispatchers.IO) {
-            val file = screenshotManager.getScreenshotFile(step.stepId)
-            if (file == null) {
+        val file = withContext(Dispatchers.IO) {
+            val f = screenshotManager.getScreenshotFile(step.stepId)
+            if (f == null) {
                 val path = screenshotManager.capture(step.stepId)
-                if (path != null) {
-                    screenshotBitmap = BitmapFactory.decodeFile(path)
-                }
+                if (path != null) BitmapFactory.decodeFile(path) else null
             } else {
-                screenshotBitmap = BitmapFactory.decodeFile(file.absolutePath)
+                BitmapFactory.decodeFile(f.absolutePath)
             }
         }
+        screenshotBitmap = file // Set on Main thread (inside LaunchedEffect)
     }
 
     Surface(

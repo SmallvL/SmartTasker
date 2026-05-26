@@ -28,7 +28,7 @@ fun TaskDetailScreen(
     runRepo: RunRepository,
     routeRepo: RouteRepository,
     onBack: () -> Unit,
-    onOpenRouteStudio: (String) -> Unit,
+    onOpenRouteStudio: (routeId: String, taskName: String) -> Unit,
     onStartTrial: (TaskEntity) -> Unit
 ) {
     var task by remember { mutableStateOf<TaskEntity?>(null) }
@@ -109,7 +109,7 @@ fun TaskDetailScreen(
             } else {
                 items(routes.size) { index ->
                     val route = routes[index]
-                    SmartCard(onClick = { onOpenRouteStudio(route.routeId) }) {
+                    SmartCard(onClick = { onOpenRouteStudio(route.routeId, task?.name ?: taskId) }) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column { Text("v${route.version}", fontWeight = FontWeight.Medium); Text(route.changeSummary.ifEmpty { route.source }, fontSize = 13.sp, color = SmartColors.textSecondary()) }
                             StatusPill(when(route.status) { "published"->"已发布"; "draft"->"草稿"; else->route.status }, if (route.status == "published") SmartColors.success() else SmartColors.textTertiary())

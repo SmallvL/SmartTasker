@@ -282,7 +282,7 @@ fun MainNavigation(
                     runRepo = runRepo,
                     routeRepo = routeRepo,
                     onBack = { navController.popBackStack() },
-                    onOpenRouteStudio = { routeId -> navController.navigate("route_studio/$routeId/${java.net.URLEncoder.encode(taskId, "UTF-8")}?taskName=${java.net.URLEncoder.encode(taskId, "UTF-8")}") },
+                    onOpenRouteStudio = { routeId, taskName -> navController.navigate("route_studio/$routeId/${java.net.URLEncoder.encode(taskId, "UTF-8")}?taskName=${java.net.URLEncoder.encode(taskName, "UTF-8")}") },
                     onStartTrial = { task -> navController.navigate("trial/${task.taskId}") }
                 )
             }
@@ -326,7 +326,18 @@ fun MainNavigation(
                                     scope.launch {
                                         val typeSummaries = steps
                                             .filter { it.status == TrialStepStatus.SUCCESS }
-                                            .map { it.summary to it.summary }
+                                            .map { step ->
+                                                // Infer step type from summary
+                                                val type = when {
+                                                    step.summary.contains("打开") -> "open_app"
+                                                    step.summary.contains("输入") || step.summary.contains("搜索") -> "input"
+                                                    step.summary.contains("滑动") -> "swipe"
+                                                    step.summary.contains("等待") -> "wait"
+                                                    step.summary.contains("返回") -> "back"
+                                                    else -> "tap"
+                                                }
+                                                type to step.summary
+                                            }
                                         val routeId = if (typeSummaries.isNotEmpty()) {
                                             routeRepo.saveFromTrialSteps(task!!.taskId, typeSummaries)
                                         } else ""
@@ -367,6 +378,7 @@ fun MainNavigation(
                 val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
                 val routeId = backStackEntry.arguments?.getString("routeId") ?: ""
                 var task by remember { mutableStateOf<TaskEntity?>(null) }
+                val ctx = androidx.compose.ui.platform.LocalContext.current
                 LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
                 if (task != null) {
@@ -390,9 +402,13 @@ fun MainNavigation(
                         },
                         onDiscard = {
                             scope.launch {
-                                // Clean up DB
                                 if (routeId.isNotEmpty()) {
+                                    // Clean up DB
                                     routeRepo.deleteRoute(routeId)
+                                    // Clean up draft files
+                                    try {
+                                        com.smarttasker.core.record.RouteDraftStore(ctx).delete(routeId)
+                                    } catch (_: Exception) {}
                                 }
                                 navController.popBackStack()
                             }

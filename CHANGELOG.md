@@ -40,6 +40,20 @@
 
 ---
 
+## [0.1.3] — 2026-05-26
+
+### Fixed
+- **StepDetailPanel 状态串数据** 🔴：切步骤时 `remember` 不重置导致旧数据覆盖新步骤。所有关键状态改用 `remember(step.stepId)`
+- **saveFromDraft 无事务保护** 🔴：先删后插改为 `@Transaction` 原子操作，防止崩溃时数据全丢
+- **taskName 传 taskId** 🔴：TaskDetailScreen 打开 RouteStudio 时标题显示 taskId 而非任务名
+- **AI 试跑步骤全部失败** 🟡：locatorValue 为空+type=summary。改为推断步骤类型
+- **录制加载竞态** 🟡：固定 1 秒 delay 改为轮询最长 10 秒，低端设备不再丢数据
+- **编辑按钮空操作**：显示"编辑功能即将上线"提示
+- **截图 IO 线程设 State**：改用 `withContext(IO)` + 主线程设值
+- **放弃路线文件残留**：同时清理 Room DB + RouteDraftStore 文件
+
+---
+
 ## [0.1.0] — 2026-05-26
 
 ### Added
