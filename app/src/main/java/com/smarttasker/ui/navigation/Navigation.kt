@@ -36,6 +36,7 @@ import com.smarttasker.ui.runs.RunListScreen
 import com.smarttasker.ui.settings.SettingsScreen
 import com.smarttasker.ui.create.CreateTaskScreen
 import com.smarttasker.ui.trialrun.TrialRunScreen
+import com.smarttasker.ui.trialrun.TrialStepStatus
 import com.smarttasker.ui.trialrun.TrialModeSelectScreen
 import com.smarttasker.ui.trialrun.ManualRecordingScreen
 import com.smarttasker.ui.trialrun.RouteLearningResultScreen
@@ -322,8 +323,16 @@ fun MainNavigation(
                                 task = task!!,
                                 executionService = executionService,
                                 onComplete = { steps ->
-                                    navController.navigate("learning_result/${task!!.taskId}") {
-                                        popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                    scope.launch {
+                                        val typeSummaries = steps
+                                            .filter { it.status == TrialStepStatus.SUCCESS }
+                                            .map { it.summary to it.summary }
+                                        val routeId = if (typeSummaries.isNotEmpty()) {
+                                            routeRepo.saveFromTrialSteps(task!!.taskId, typeSummaries)
+                                        } else ""
+                                        navController.navigate("learning_result/${task!!.taskId}?routeId=$routeId") {
+                                            popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                        }
                                     }
                                 },
                                 onCancel = { navController.popBackStack() }
@@ -333,8 +342,11 @@ fun MainNavigation(
                             ManualRecordingScreen(
                                 task = task!!,
                                 onRecordingComplete = { routeDraft ->
-                                    navController.navigate("learning_result/${task!!.taskId}") {
-                                        popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                    scope.launch {
+                                        val routeId = routeRepo.saveFromDraft(routeDraft, task!!.taskId)
+                                        navController.navigate("learning_result/${task!!.taskId}?routeId=$routeId") {
+                                            popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                        }
                                     }
                                 },
                                 onCancel = { navController.popBackStack() }
@@ -346,24 +358,31 @@ fun MainNavigation(
 
             // ===== Learning Result =====
             composable(
-                "learning_result/{taskId}",
-                arguments = listOf(navArgument("taskId") { type = NavType.StringType })
+                "learning_result/{taskId}?routeId={routeId}",
+                arguments = listOf(
+                    navArgument("taskId") { type = NavType.StringType },
+                    navArgument("routeId") { type = NavType.StringType; defaultValue = "" }
+                )
             ) { backStackEntry ->
                 val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+                val routeId = backStackEntry.arguments?.getString("routeId") ?: ""
                 var task by remember { mutableStateOf<TaskEntity?>(null) }
                 LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
                 if (task != null) {
                     RouteLearningResultScreen(
                         task = task!!,
-                        steps = emptyList(),
+                        routeId = routeId,
+                        routeRepo = routeRepo,
                         onSaveAndEnable = {
                             scope.launch {
                                 taskRepo.activateTask(task!!)
                                 navController.navigate(Screen.Home.route) { popUpTo(Screen.Home.route) { inclusive = true } }
                             }
                         },
-                        onOpenRouteStudio = { navController.popBackStack() },
+                        onOpenRouteStudio = { rid ->
+                            navController.navigate("route_studio/$rid/${task!!.taskId}?taskName=${java.net.URLEncoder.encode(task!!.name, "UTF-8")}")
+                        },
                         onDiscard = { navController.popBackStack() }
                     )
                 }

@@ -12,6 +12,28 @@
 
 ---
 
+## [0.1.0] — 2026-05-26
+
+### Added
+- **路线学习结果页** (#D02): 录制完成后展示真实路线步骤摘要，支持查看步骤类型、定位方式、风险等级
+- **路线持久化到 Room DB** (#D04): `RouteRepository.saveFromDraft()` 将录制产出的 RouteDraft 转为 RouteVersionEntity + RouteStepEntity 存入数据库
+- **路线复用执行** (#D05): Route Studio 支持完整路线测试和单步测试，通过 InputEngine/SenseEngine 真实执行 tap/swipe/input/back/home 等操作
+- **步骤截图** (#D03): `ScreenshotManager` 通过 ADB screencap 捕获屏幕，Route Studio 步骤详情面板展示真实截图
+- **AI 试跑路线保存**: TrialRunScreen 完成后自动保存 AI 执行步骤到 Room DB
+- `RouteDao.getAllRoutes()` 用于首页路线列表
+
+### Changed
+- `RouteLearningResultScreen` 改为从 Room DB 加载路线数据（routeId 驱动），支持类型/定位/风险 Pill 展示
+- `RouteRepository` 新增 `saveFromDraft()`, `saveFromTrialSteps()` 方法
+- `RouteStudioScreen` 重构：截图自动捕获、真实路线测试、发布按钮可用
+- Navigation 链路修复：录制/试跑→DB 保存→携带 routeId 跳转学习结果页
+
+### Fixed
+- 修复路线学习结果页 `steps` 永远为 `emptyList()` 的断链 bug
+- 修复 Navigation 中 TrialStepStatus 未导入的编译错误
+
+---
+
 ## [0.0.2] — 2026-05-26
 
 ### Fixed

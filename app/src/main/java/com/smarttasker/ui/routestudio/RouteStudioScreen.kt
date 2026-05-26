@@ -1,6 +1,8 @@
 package com.smarttasker.ui.routestudio
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -12,16 +14,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.smarttasker.core.adb.ScreenshotManager
 import com.smarttasker.core.bridge.CoreBridgeManager
+import com.smarttasker.core.direct.InputEngine
+import com.smarttasker.core.direct.SenseEngine
 import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.data.entity.RouteVersionEntity
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,14 +43,17 @@ fun RouteStudioScreen(
     coreBridgeManager: CoreBridgeManager? = null,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val steps by routeRepo.getStepsForRoute(routeId).collectAsState(initial = emptyList())
     var selectedStep by remember { mutableStateOf<RouteStepEntity?>(null) }
     var showStepEditor by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<RouteStepEntity?>(null) }
     var isTestingRoute by remember { mutableStateOf(false) }
+    var isTestingStep by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val screenshotManager = remember { ScreenshotManager(context) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -61,15 +75,20 @@ fun RouteStudioScreen(
                     // Test route
                     TextButton(
                         onClick = {
-                            isTestingRoute = true
-                            testResult = null
-                            // TODO: Call CoreBridge to test route
                             coroutineScope.launch {
-                                snackbarHostState.showSnackbar("测试功能需要连接 Core")
+                                isTestingRoute = true
+                                testResult = null
+                                val result = executeRoute(steps, context)
+                                testResult = result
                                 isTestingRoute = false
+                                if (result.startsWith("✅")) {
+                                    snackbarHostState.showSnackbar("路线执行成功")
+                                } else {
+                                    snackbarHostState.showSnackbar("执行失败: ${result.take(50)}")
+                                }
                             }
                         },
-                        enabled = !isTestingRoute
+                        enabled = !isTestingRoute && steps.isNotEmpty()
                     ) {
                         if (isTestingRoute) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -82,7 +101,11 @@ fun RouteStudioScreen(
                     // Publish
                     TextButton(onClick = {
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("路线已发布")
+                            val route = routeRepo.getRouteById(routeId)
+                            if (route != null) {
+                                routeRepo.publishRoute(route)
+                                snackbarHostState.showSnackbar("路线已发布")
+                            }
                         }
                     }) {
                         Icon(Icons.Outlined.Publish, null, modifier = Modifier.size(18.dp))
@@ -92,6 +115,23 @@ fun RouteStudioScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
+
+            // Test result banner
+            if (testResult != null) {
+                val isSuccess = testResult!!.startsWith("✅")
+                Surface(
+                    color = if (isSuccess) SmartColors.success().copy(alpha = 0.1f)
+                    else SmartColors.danger().copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        testResult!!,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        fontSize = 13.sp,
+                        color = if (isSuccess) SmartColors.success() else SmartColors.danger()
+                    )
+                }
+            }
 
             if (steps.isEmpty()) {
                 EmptyState(icon = Icons.Outlined.Route, title = "还没有路线", subtitle = "完成首次试跑后会自动生成路线")
@@ -105,21 +145,36 @@ fun RouteStudioScreen(
                         StepCard(
                             step = step,
                             isSelected = selectedStep?.stepId == step.stepId,
-                            onClick = { selectedStep = step; showStepEditor = true },
+                            onClick = {
+                                selectedStep = step
+                                showStepEditor = true
+                                // Auto-capture screenshot on step selection
+                                coroutineScope.launch {
+                                    screenshotManager.capture(step.stepId)
+                                }
+                            },
                             onToggleEnabled = { coroutineScope.launch { routeRepo.toggleStepEnabled(step) } },
                             onToggleLocked = { coroutineScope.launch { routeRepo.toggleStepLocked(step) } },
                             onDelete = { showDeleteConfirm = step }
                         )
                     }
-                    item { Spacer(Modifier.height(16.dp)) }
+                    item { Spacer(Modifier.height(120.dp)) }
                 }
 
                 // Step detail panel
                 if (showStepEditor && selectedStep != null) {
                     StepDetailPanel(
                         step = selectedStep!!,
-                        onEdit = { /* TODO: open editor */ },
-                        onTest = { /* TODO: single step test */ },
+                        screenshotManager = screenshotManager,
+                        onEdit = { /* TODO: open full editor */ },
+                        onSingleStepTest = {
+                            coroutineScope.launch {
+                                isTestingStep = true
+                                val result = executeSingleStep(selectedStep!!, context)
+                                isTestingStep = false
+                                snackbarHostState.showSnackbar(result)
+                            }
+                        },
                         onWaitTimeChange = { newTime ->
                             coroutineScope.launch {
                                 routeRepo.updateStep(selectedStep!!.copy(waitTimeMs = newTime))
@@ -148,17 +203,150 @@ fun RouteStudioScreen(
                         }
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = SmartColors.danger())
-                ) {
-                    Text("删除")
-                }
+                ) { Text("删除") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = null }) {
-                    Text("取消")
-                }
+                TextButton(onClick = { showDeleteConfirm = null }) { Text("取消") }
             }
         )
     }
+}
+
+/**
+ * Execute all steps in route order. Returns result summary.
+ */
+private suspend fun executeRoute(steps: List<RouteStepEntity>, context: android.content.Context): String = 
+    withContext(Dispatchers.IO) {
+        val sense = SenseEngine(context)
+        val input = InputEngine()
+        val activeSteps = steps.filter { it.enabled }
+
+        if (activeSteps.isEmpty()) return@withContext "❌ 没有可执行的步骤"
+        if (!sense.isAppInstalled("com.android.shell")) {
+            // Just check shell is accessible
+        }
+
+        val results = mutableListOf<String>()
+        var successCount = 0
+
+        for (step in activeSteps) {
+            try {
+                val ok = executeStepAction(step, sense, input)
+                if (ok) {
+                    successCount++
+                    results.add("✓ ${step.summary}")
+                } else {
+                    results.add("✗ ${step.summary}")
+                }
+                // Wait between steps
+                if (step.waitTimeMs > 0) {
+                    kotlinx.coroutines.delay(step.waitTimeMs)
+                }
+            } catch (e: Exception) {
+                results.add("✗ ${step.summary}: ${e.message}")
+            }
+        }
+
+        if (successCount == activeSteps.size) "✅ 全部 $successCount 步执行成功"
+        else "⚠️ $successCount/${activeSteps.size} 步成功，${activeSteps.size - successCount} 步失败\n${results.takeLast(3).joinToString("\n")}"
+    }
+
+/**
+ * Execute a single step. Returns result message.
+ */
+private suspend fun executeSingleStep(step: RouteStepEntity, context: android.content.Context): String =
+    withContext(Dispatchers.IO) {
+        val sense = SenseEngine(context)
+        val input = InputEngine()
+        val ok = executeStepAction(step, sense, input)
+        if (ok) "✅ ${step.summary}" else "❌ ${step.summary} 执行失败"
+    }
+
+private suspend fun executeStepAction(
+    step: RouteStepEntity,
+    sense: SenseEngine,
+    input: InputEngine
+): Boolean {
+    return try {
+        when (step.type) {
+            "tap" -> {
+                val coords = parseCoordinate(step.locatorValue)
+                if (coords != null) {
+                    input.tap(coords.first, coords.second)
+                    kotlinx.coroutines.delay(500)
+                    true
+                } else false
+            }
+            "swipe" -> {
+                // Simple swipe using locator value as "startX,startY endX,endY"
+                val parts = step.locatorValue.split(",")
+                if (parts.size >= 4) {
+                    input.swipe(
+                        parts[0].trim().toIntOrNull() ?: 0,
+                        parts[1].trim().toIntOrNull() ?: 0,
+                        parts[2].trim().toIntOrNull() ?: 0,
+                        parts[3].trim().toIntOrNull() ?: 0,
+                        300
+                    )
+                    kotlinx.coroutines.delay(500)
+                    true
+                } else false
+            }
+            "input" -> {
+                input.inputText(step.locatorValue)
+                kotlinx.coroutines.delay(300)
+                true
+            }
+            "wait" -> {
+                val ms = step.locatorValue.toLongOrNull() ?: step.waitTimeMs
+                kotlinx.coroutines.delay(ms)
+                true
+            }
+            "back" -> {
+                input.pressBack()
+                kotlinx.coroutines.delay(500)
+                true
+            }
+            "home" -> {
+                input.pressHome()
+                kotlinx.coroutines.delay(500)
+                true
+            }
+            "open_app" -> {
+                sense.launchApp(step.locatorValue)
+                kotlinx.coroutines.delay(2000)
+                true
+            }
+            "key" -> {
+                val keyCode = step.locatorValue.toIntOrNull() ?: 0
+                if (keyCode > 0) {
+                    input.pressKey(keyCode)
+                    kotlinx.coroutines.delay(300)
+                    true
+                } else false
+            }
+            else -> {
+                // Unknown type, try as tap if there are coords
+                val coords = parseCoordinate(step.locatorValue)
+                if (coords != null) {
+                    input.tap(coords.first, coords.second)
+                    kotlinx.coroutines.delay(500)
+                    true
+                } else false
+            }
+        }
+    } catch (e: Exception) {
+        false
+    }
+}
+
+private fun parseCoordinate(value: String): Pair<Int, Int>? {
+    if (value.isBlank()) return null
+    val parts = value.split(",")
+    if (parts.size < 2) return null
+    val x = parts[0].trim().toIntOrNull() ?: return null
+    val y = parts[1].trim().toIntOrNull() ?: return null
+    return Pair(x, y)
 }
 
 @Composable
@@ -221,6 +409,8 @@ private fun StepCard(
                             "wait" -> "等待"
                             "open_app" -> "打开应用"
                             "back" -> "返回"
+                            "home" -> "主页"
+                            "key" -> "按键"
                             else -> step.type
                         },
                         SmartColors.textTertiary()
@@ -266,13 +456,32 @@ private fun StepCard(
 @Composable
 private fun StepDetailPanel(
     step: RouteStepEntity,
+    screenshotManager: ScreenshotManager,
     onEdit: () -> Unit,
-    onTest: () -> Unit,
+    onSingleStepTest: () -> Unit,
     onWaitTimeChange: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     var showWaitTimeEditor by remember { mutableStateOf(false) }
     var waitTimeText by remember { mutableStateOf((step.waitTimeMs / 1000).toString()) }
+    var screenshotBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Load screenshot when panel opens
+    LaunchedEffect(step.stepId) {
+        coroutineScope.launch(Dispatchers.IO) {
+            val file = screenshotManager.getScreenshotFile(step.stepId)
+            if (file == null) {
+                // Try to capture now
+                val path = screenshotManager.capture(step.stepId)
+                if (path != null) {
+                    screenshotBitmap = BitmapFactory.decodeFile(path)
+                }
+            } else {
+                screenshotBitmap = BitmapFactory.decodeFile(file.absolutePath)
+            }
+        }
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -290,16 +499,31 @@ private fun StepDetailPanel(
             }
             Spacer(Modifier.height(12.dp))
 
-            // Screenshot placeholder
-            Surface(
-                shape = RoundedCornerShape(16),
-                color = SmartColors.textTertiary().copy(alpha = 0.1f),
-                modifier = Modifier.fillMaxWidth().height(160.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Outlined.Screenshot, null, modifier = Modifier.size(36.dp), tint = SmartColors.textTertiary())
-                        Text("步骤截图", fontSize = 13.sp, color = SmartColors.textTertiary())
+            // Screenshot or placeholder
+            val bitmap = screenshotBitmap
+            if (bitmap != null) {
+                Surface(
+                    shape = RoundedCornerShape(16),
+                    modifier = Modifier.fillMaxWidth().height(200.dp)
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "步骤截图",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(16),
+                    color = SmartColors.textTertiary().copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth().height(160.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Outlined.Screenshot, null, modifier = Modifier.size(36.dp), tint = SmartColors.textTertiary())
+                            Text("点击刷新截图", fontSize = 13.sp, color = SmartColors.textTertiary())
+                        }
                     }
                 }
             }
@@ -309,11 +533,12 @@ private fun StepDetailPanel(
             Text("步骤 ${step.stepIndex}: ${step.summary}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(Modifier.height(12.dp))
 
-            DetailRow("动作", when (step.type) { "tap" -> "点击"; "input" -> "输入"; else -> step.type })
+            DetailRow("动作", when (step.type) { "tap" -> "点击"; "input" -> "输入"; "swipe" -> "滑动"; "wait" -> "等待"; "back" -> "返回"; "home" -> "主页"; "open_app" -> "打开应用"; "key" -> "按键"; else -> step.type })
             DetailRow("定位方式", step.locatorStrategy)
             if (step.locatorValue.isNotEmpty()) DetailRow("定位值", step.locatorValue)
             DetailRow("等待时间", "${step.waitTimeMs}ms")
-            DetailRow("来源", when (step.source) { "ai_learned" -> "AI 学习"; "user_edit" -> "手动编辑"; else -> step.source })
+            DetailRow("来源", when (step.source) { "ai_learned" -> "AI 学习"; "manual_recording" -> "手动录制"; "user_edit" -> "手动编辑"; else -> step.source })
+            if (step.riskLevel != "low") DetailRow("风险等级", step.riskLevel, SmartColors.warning())
 
             // Wait time editor
             Spacer(Modifier.height(12.dp))
@@ -353,9 +578,7 @@ private fun StepDetailPanel(
                             showWaitTimeEditor = false
                         },
                         shape = RoundedCornerShape(12)
-                    ) {
-                        Text("保存")
-                    }
+                    ) { Text("保存") }
                 }
             }
 
@@ -368,7 +591,8 @@ private fun StepDetailPanel(
                         Text("AI 建议", fontWeight = FontWeight.Medium, fontSize = 14.sp, color = SmartColors.accent())
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            if (step.locatorStrategy == "coordinate") "建议改为文本定位，提高稳定性" else "当前定位方式较稳定",
+                            if (step.locatorStrategy == "coordinate") "建议改为文本定位，提高稳定性"
+                            else "当前定位方式较稳定",
                             fontSize = 13.sp,
                             color = SmartColors.textSecondary()
                         )
@@ -390,7 +614,7 @@ private fun StepDetailPanel(
                     Text("编辑")
                 }
                 OutlinedButton(
-                    onClick = onTest,
+                    onClick = onSingleStepTest,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16)
                 ) {

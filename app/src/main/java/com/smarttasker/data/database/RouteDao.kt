@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RouteDao {
+    @Query("SELECT * FROM route_versions ORDER BY createdAt DESC")
+    fun getAllRoutes(): Flow<List<RouteVersionEntity>>
+
     @Query("SELECT * FROM route_versions WHERE taskId = :taskId ORDER BY createdAt DESC")
     fun getRouteVersions(taskId: String): Flow<List<RouteVersionEntity>>
 
