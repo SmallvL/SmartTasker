@@ -2,6 +2,7 @@ package com.smarttasker.ui.routestudio
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,11 +14,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.core.adb.ScreenshotManager
@@ -178,6 +184,18 @@ fun RouteStudioScreen(
                         onWaitTimeChange = { newTime ->
                             coroutineScope.launch {
                                 routeRepo.updateStep(selectedStep!!.copy(waitTimeMs = newTime))
+                            }
+                        },
+                        onLocatorChange = { strategy, value ->
+                            coroutineScope.launch {
+                                val updated = selectedStep!!.copy(
+                                    locatorStrategy = strategy,
+                                    locatorValue = value,
+                                    userModified = true
+                                )
+                                routeRepo.updateStep(updated)
+                                selectedStep = updated
+                                snackbarHostState.showSnackbar("定位已更新")
                             }
                         },
                         onDismiss = { showStepEditor = false }
@@ -454,25 +472,33 @@ private fun StepCard(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun StepDetailPanel(
     step: RouteStepEntity,
     screenshotManager: ScreenshotManager,
     onEdit: () -> Unit,
     onSingleStepTest: () -> Unit,
     onWaitTimeChange: (Long) -> Unit,
+    onLocatorChange: (strategy: String, value: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var showWaitTimeEditor by remember { mutableStateOf(false) }
+    var showLocatorEditor by remember { mutableStateOf(false) }
     var waitTimeText by remember { mutableStateOf((step.waitTimeMs / 1000).toString()) }
+    var locatorStrategy by remember { mutableStateOf(step.locatorStrategy) }
+    var locatorValue by remember { mutableStateOf(step.locatorValue) }
     var screenshotBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var screenshotSize by remember { mutableStateOf(IntSize.Zero) }
     val coroutineScope = rememberCoroutineScope()
+
+    // Parse tap coordinates for overlay
+    val coords = remember(step.locatorValue) { parseCoordinate(step.locatorValue) }
 
     // Load screenshot when panel opens
     LaunchedEffect(step.stepId) {
         coroutineScope.launch(Dispatchers.IO) {
             val file = screenshotManager.getScreenshotFile(step.stepId)
             if (file == null) {
-                // Try to capture now
                 val path = screenshotManager.capture(step.stepId)
                 if (path != null) {
                     screenshotBitmap = BitmapFactory.decodeFile(path)
@@ -499,12 +525,14 @@ private fun StepDetailPanel(
             }
             Spacer(Modifier.height(12.dp))
 
-            // Screenshot or placeholder
+            // Screenshot with tap marker overlay
             val bitmap = screenshotBitmap
             if (bitmap != null) {
-                Surface(
-                    shape = RoundedCornerShape(16),
-                    modifier = Modifier.fillMaxWidth().height(200.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .onSizeChanged { screenshotSize = it }
                 ) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
@@ -512,6 +540,68 @@ private fun StepDetailPanel(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
+                    // Overlay tap marker
+                    if (coords != null && screenshotSize != IntSize.Zero) {
+                        val bitmapW = bitmap.width.toFloat()
+                        val bitmapH = bitmap.height.toFloat()
+                        val viewW = screenshotSize.width.toFloat()
+                        val viewH = screenshotSize.height.toFloat()
+
+                        // Calculate scale to fit
+                        val scaleX = viewW / bitmapW
+                        val scaleY = viewH / bitmapH
+                        val scale = minOf(scaleX, scaleY)
+                        val offsetX = (viewW - bitmapW * scale) / 2f
+                        val offsetY = (viewH - bitmapH * scale) / 2f
+
+                        val tapX = coords.first.toFloat() * scale + offsetX
+                        val tapY = coords.second.toFloat() * scale + offsetY
+
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            // Outer circle
+                            drawCircle(
+                                color = Color(0xFF5E6AD2),
+                                radius = 18f,
+                                center = Offset(tapX, tapY),
+                                style = Stroke(width = 2.5f)
+                            )
+                            // Inner dot
+                            drawCircle(
+                                color = Color(0xFF5E6AD2).copy(alpha = 0.6f),
+                                radius = 5f,
+                                center = Offset(tapX, tapY)
+                            )
+                            // Crosshair
+                            drawLine(
+                                color = Color(0xFF5E6AD2).copy(alpha = 0.4f),
+                                start = Offset(tapX - 10f, tapY),
+                                end = Offset(tapX + 10f, tapY),
+                                strokeWidth = 1.5f
+                            )
+                            drawLine(
+                                color = Color(0xFF5E6AD2).copy(alpha = 0.4f),
+                                start = Offset(tapX, tapY - 10f),
+                                end = Offset(tapX, tapY + 10f),
+                                strokeWidth = 1.5f
+                            )
+                        }
+                    }
+
+                    // Coordinate label
+                    if (coords != null) {
+                        Surface(
+                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                            shape = RoundedCornerShape(6),
+                            color = Color(0xCC121212)
+                        ) {
+                            Text(
+                                "📍 (${coords.first}, ${coords.second})",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             } else {
                 Surface(
@@ -522,26 +612,105 @@ private fun StepDetailPanel(
                     Box(contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Outlined.Screenshot, null, modifier = Modifier.size(36.dp), tint = SmartColors.textTertiary())
-                            Text("点击刷新截图", fontSize = 13.sp, color = SmartColors.textTertiary())
+                            Text("选中步骤自动截图", fontSize = 13.sp, color = SmartColors.textTertiary())
+                            Text("需 ADB 连接", fontSize = 11.sp, color = SmartColors.textTertiary())
                         }
                     }
                 }
             }
             Spacer(Modifier.height(16.dp))
 
-            // Step info
+            // Step info header
             Text("步骤 ${step.stepIndex}: ${step.summary}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(Modifier.height(12.dp))
 
             DetailRow("动作", when (step.type) { "tap" -> "点击"; "input" -> "输入"; "swipe" -> "滑动"; "wait" -> "等待"; "back" -> "返回"; "home" -> "主页"; "open_app" -> "打开应用"; "key" -> "按键"; else -> step.type })
-            DetailRow("定位方式", step.locatorStrategy)
-            if (step.locatorValue.isNotEmpty()) DetailRow("定位值", step.locatorValue)
+            DetailRow("定位方式", locatorStrategy)
+            if (locatorValue.isNotEmpty()) DetailRow("定位值", locatorValue)
             DetailRow("等待时间", "${step.waitTimeMs}ms")
             DetailRow("来源", when (step.source) { "ai_learned" -> "AI 学习"; "manual_recording" -> "手动录制"; "user_edit" -> "手动编辑"; else -> step.source })
             if (step.riskLevel != "low") DetailRow("风险等级", step.riskLevel, SmartColors.warning())
 
+            // Locator editor
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(12),
+                color = SmartColors.warning().copy(alpha = 0.05f),
+                onClick = { showLocatorEditor = !showLocatorEditor }
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Outlined.MyLocation, null, modifier = Modifier.size(18.dp), tint = SmartColors.warning())
+                    Text("修改定位方式", fontSize = 14.sp, color = SmartColors.warning())
+                    if (step.userModified) {
+                        Text("(已修改)", fontSize = 11.sp, color = SmartColors.textTertiary())
+                    }
+                }
+            }
+
+            if (showLocatorEditor) {
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Locator strategy dropdown
+                    Text("定位策略", fontSize = 13.sp, color = SmartColors.textSecondary())
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val strategies = listOf("coordinate" to "坐标", "text" to "文本", "resource_id" to "资源ID", "content_desc" to "内容描述")
+                        strategies.forEach { (value, label) ->
+                            FilterChip(
+                                selected = locatorStrategy == value,
+                                onClick = { locatorStrategy = value },
+                                label = { Text(label, fontSize = 12.sp) },
+                                modifier = Modifier.height(32.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = SmartColors.accent().copy(alpha = 0.15f),
+                                    selectedLabelColor = SmartColors.accent()
+                                )
+                            )
+                        }
+                    }
+
+                    // Locator value field
+                    OutlinedTextField(
+                        value = locatorValue,
+                        onValueChange = { locatorValue = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("定位值") },
+                        placeholder = { 
+                            Text(when (locatorStrategy) {
+                                "coordinate" -> "例: 540,1200"
+                                "text" -> "例: 搜索"
+                                "resource_id" -> "例: com.example:id/search"
+                                "content_desc" -> "例: 返回按钮"
+                                else -> ""
+                            })
+                        },
+                        shape = RoundedCornerShape(12),
+                        singleLine = true
+                    )
+
+                    // Save button
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                onLocatorChange(locatorStrategy, locatorValue)
+                                showLocatorEditor = false
+                            },
+                            shape = RoundedCornerShape(12),
+                            colors = ButtonDefaults.buttonColors(containerColor = SmartColors.accent())
+                        ) { Text("保存定位") }
+                        OutlinedButton(
+                            onClick = { showLocatorEditor = false },
+                            shape = RoundedCornerShape(12)
+                        ) { Text("取消") }
+                    }
+                }
+            }
+
             // Wait time editor
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             Surface(
                 shape = RoundedCornerShape(12),
                 color = SmartColors.accent().copy(alpha = 0.05f),
@@ -583,7 +752,7 @@ private fun StepDetailPanel(
             }
 
             // AI suggestion
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             Surface(shape = RoundedCornerShape(16), color = SmartColors.accent().copy(alpha = 0.08f)) {
                 Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Outlined.AutoAwesome, null, tint = SmartColors.accent(), modifier = Modifier.size(20.dp))
