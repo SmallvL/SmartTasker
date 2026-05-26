@@ -48,16 +48,19 @@ class DeviceStatusChecker(private val context: Context) {
         val endpoint = savedEp.second
         val adbConnected = com.smarttasker.core.direct.ShellExecutor.detectMode().let {
             it == com.smarttasker.core.direct.ShellExecutor.ShellMode.ADB ||
-            it == com.smarttasker.core.direct.ShellExecutor.ShellMode.ADB_LOCAL ||
+            it == com.smarttasker.core.direct.ShellExecutor.ShellMode.ADB_LOCAL
+        }
+        val shellAvailable = com.smarttasker.core.direct.ShellExecutor.detectMode().let {
             it == com.smarttasker.core.direct.ShellExecutor.ShellMode.SH
         }
         val rootAvail = tryRoot()
-        // Port is reachable if ADB is already connected (TLS, TCP, or SH) OR raw TCP connects
+        // Port is reachable if ADB is already connected (TLS/TCP) OR raw TCP connects
         val portReachable = if (adbConnected) true else if (hasEndpoint) isPortReachable(endpoint) else false
-        val running = adbConnected || rootAvail
+        val running = adbConnected || rootAvail || shellAvailable
         val mode = when {
             rootAvail -> "root"
             adbConnected -> "adb"
+            shellAvailable -> "sh"
             else -> "none"
         }
 
@@ -86,14 +89,17 @@ class DeviceStatusChecker(private val context: Context) {
         val current = _status.value
         val adbConnected = com.smarttasker.core.direct.ShellExecutor.detectMode().let {
             it == com.smarttasker.core.direct.ShellExecutor.ShellMode.ADB ||
-            it == com.smarttasker.core.direct.ShellExecutor.ShellMode.ADB_LOCAL ||
+            it == com.smarttasker.core.direct.ShellExecutor.ShellMode.ADB_LOCAL
+        }
+        val shellAvailable = com.smarttasker.core.direct.ShellExecutor.detectMode().let {
             it == com.smarttasker.core.direct.ShellExecutor.ShellMode.SH
         }
         val rootAvail = tryRoot()
-        val running = adbConnected || rootAvail
+        val running = adbConnected || rootAvail || shellAvailable
         val mode = when {
             rootAvail -> "root"
             adbConnected -> "adb"
+            shellAvailable -> "sh"
             else -> "none"
         }
         // Port is reachable if ADB is already connected (TLS handles the real connection)

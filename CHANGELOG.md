@@ -12,6 +12,20 @@
 
 ---
 
+## [0.0.2] — 2026-05-26
+
+### Fixed
+- **Core ADB 重连死循环** (#4): 修复 `useDirectBridge()` 中 `resetCache()` 断开刚建立的 ADB 连接导致重连失败
+- **诊断项状态不一致** (#5): `DeviceStatusChecker` 不再将 SH 模式错误标记为"ADB Shell 已连接"
+- **试跑闪退** (#6): 移除 `TrialRunScreen` 中未使用的 `org.json.JSONObject` 导入。修复 `buildTaskPayload()` 中 `execution.mode` 空安全导致 NPE
+
+### Changed
+- `CoreBridgeManager.useDirectBridge()` 不再调用 `resetCache()`，保留已建立的连接
+- 新增 `CoreBridgeManager.forceResetAndRefresh()` 用于需要真正重置的场景
+- `DeviceStatusChecker` 新增 `sh` 模式支持，`adbConnected` 仅表示真正 ADB 连接
+
+---
+
 ## [0.0.1] — 2026-05-25
 
 ### Added

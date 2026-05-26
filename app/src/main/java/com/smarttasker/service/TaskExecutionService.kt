@@ -238,7 +238,7 @@ class TaskExecutionService(
         sb.append(",\"name\":").append(jsonEscape(spec.name))
         sb.append(",\"description\":").append(jsonEscape(spec.description ?: ""))
         sb.append(",\"playbook\":").append(jsonEscape(spec.playbook ?: ""))
-        sb.append(",\"execution_mode\":").append(jsonEscape(spec.execution.mode))
+        sb.append(",\"execution_mode\":").append(jsonEscape(spec.execution.mode ?: "manual"))
         sb.append(",\"route_enabled\":").append(spec.execution.routeEnabled)
 
         // target_app

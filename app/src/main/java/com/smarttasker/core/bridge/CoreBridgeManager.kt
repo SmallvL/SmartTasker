@@ -114,10 +114,22 @@ class CoreBridgeManager private constructor(private val context: Context) {
 
     /**
      * Switch to direct mode (standalone, uses root/adb shell).
+     * Does NOT call resetCache() — preserves any existing ADB/root connection.
      */
     fun useDirectBridge() {
         _bridge = DirectCoreBridge(context)
         _isDirectMode.value = true
+        scope.launch {
+            _shellMode.value = ShellExecutor.detectMode()
+            checkStatus()
+        }
+    }
+
+    /**
+     * Force reset and re-detect shell mode. Use after pairing changes.
+     * Unlike useDirectBridge(), this actually resets the connection cache.
+     */
+    fun forceResetAndRefresh() {
         scope.launch {
             ShellExecutor.resetCache()
             _shellMode.value = ShellExecutor.detectMode()

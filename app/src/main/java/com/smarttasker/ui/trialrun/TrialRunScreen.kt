@@ -23,7 +23,6 @@ import com.smarttasker.service.ExecutionState
 import com.smarttasker.service.TaskExecutionService
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
-import org.json.JSONObject
 
 enum class TrialStepStatus { PENDING, RUNNING, SUCCESS, FAILED, SKIPPED }
 
