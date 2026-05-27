@@ -12,6 +12,18 @@
 
 ---
 
+## [0.4.0] — 2026-05-27
+
+### Added
+- **AlarmScheduler** — AlarmManager 精确闹钟调度/取消/全部重排
+- **AlarmReceiver** — 接收闹钟触发，启动 TaskExecutionService 执行任务
+- **BootReceiver** — 开机自动恢复所有已启用的定时任务
+- **数据库导入** — ImportExportScreen 实现 SAF 文件选择器导入数据库
+- TaskDetailScreen 新增定时执行入口
+
+### Fixed
+- ADB_LOCAL 流式录制支持（ShellAdbClient.streamShell + AdbStreamClient 集成）
+
 ## [0.3.0] — 2026-05-27
 
 ### Added
