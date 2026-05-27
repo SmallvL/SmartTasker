@@ -270,9 +270,6 @@ private suspend fun executeRoute(steps: List<RouteStepEntity>, context: android.
         val activeSteps = steps.filter { it.enabled }
 
         if (activeSteps.isEmpty()) return@withContext "❌ 没有可执行的步骤"
-        if (!sense.isAppInstalled("com.android.shell")) {
-            // Just check shell is accessible
-        }
 
         val results = mutableListOf<String>()
         var successCount = 0
@@ -366,7 +363,7 @@ private suspend fun executeStepAction(
                 true
             }
             "key" -> {
-                val keyCode = step.locatorValue.toIntOrNull() ?: 0
+                val keyCode = step.locatorValue.toIntOrNull() ?: mapKeyNameToCode(step.locatorValue)
                 if (keyCode > 0) {
                     input.pressKey(keyCode)
                     kotlinx.coroutines.delay(300)
@@ -395,6 +392,29 @@ private fun parseCoordinate(value: String): Pair<Int, Int>? {
     val x = parts[0].trim().toIntOrNull() ?: return null
     val y = parts[1].trim().toIntOrNull() ?: return null
     return Pair(x, y)
+}
+
+/**
+ * Map key name string to Android KeyEvent code.
+ */
+private fun mapKeyNameToCode(name: String): Int = when (name.uppercase()) {
+    "BACK" -> 4
+    "HOME" -> 3
+    "MENU" -> 82
+    "POWER" -> 26
+    "APP_SWITCH", "RECENT" -> 187
+    "VOLUME_UP" -> 24
+    "VOLUME_DOWN" -> 25
+    "ENTER" -> 66
+    "DEL", "DELETE" -> 67
+    "TAB" -> 61
+    "SPACE" -> 62
+    "DPAD_UP" -> 19
+    "DPAD_DOWN" -> 20
+    "DPAD_LEFT" -> 21
+    "DPAD_RIGHT" -> 22
+    "DPAD_CENTER" -> 23
+    else -> 0
 }
 
 @Composable

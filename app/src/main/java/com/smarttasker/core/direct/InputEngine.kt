@@ -38,23 +38,22 @@ class InputEngine {
     }
 
     /**
-     * Input text. Special characters need escaping.
+     * Input text. Splits on spaces and sends each word with KEYCODE_SPACE between.
+     * This avoids the %s format specifier issue with Android's `input text`.
      */
     suspend fun inputText(text: String): Boolean {
-        // Escape special characters for shell
-        val escaped = text
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("'", "\\'")
-            .replace(" ", "%s")
-            .replace("&", "\\&")
-            .replace("|", "\\|")
-            .replace("<", "\\<")
-            .replace(">", "\\>")
-            .replace("(", "\\(")
-            .replace(")", "\\)")
-        val result = ShellExecutor.exec("input text '$escaped'")
-        return result is ShellResult.Success
+        if (text.isBlank()) return true
+        val words = text.split(" ")
+        for ((i, word) in words.withIndex()) {
+            if (word.isNotEmpty()) {
+                val result = ShellExecutor.exec("input text ${word}")
+                if (result is ShellResult.Error) return false
+            }
+            if (i < words.size - 1) {
+                pressKey(62) // KEYCODE_SPACE
+            }
+        }
+        return true
     }
 
     /**
@@ -82,11 +81,12 @@ class InputEngine {
     suspend fun pressRecent(): Boolean = pressKey(187)
 
     /**
-     * Clear text field (select all + delete).
+     * Clear text field: select all + delete.
+     * Uses a single shell call to avoid 50 round-trips.
      */
     suspend fun clearText(): Boolean {
-        // Select all then delete
-        pressKey(29) // CTRL
-        return true
+        // Move to beginning, select all to end, delete
+        val result = ShellExecutor.exec("input keyevent KEYCODE_MOVE_HOME KEYCODE_MOVE_END KEYCODE_DEL")
+        return result is ShellResult.Success
     }
 }

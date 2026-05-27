@@ -40,6 +40,19 @@
 
 ---
 
+## [0.1.4] — 2026-05-26
+
+### Fixed
+- **截图路径 SH 模式不兼容** 🔴：`SenseEngine.screenshot()` 和 `dumpHierarchy()` 改用 app 内部缓存目录，SH 模式下不再因 `/sdcard/` 写权限失败
+- **启动应用命令** 🔴：`launchApp()` 从 `monkey` 改为 `am start`，SH 模式兼容
+- **文本输入过度转义** 🔴：`InputEngine.inputText()` 简化转义逻辑，不再错误转义 shell 特殊字符导致输入异常
+- **clearText 无效** 🔴：从发送无用的 CTRL keycode 改为 HOME+END+DEL 组合键
+- **key 类型步骤无法执行** 🟡：`executeStepAction` 处理 `key` 类型时新增 key name → keycode 映射（BACK→4, HOME→3 等）
+- **无效包名检查** 🟡：移除 `executeRoute()` 中无意义的 `com.android.shell` 包名检查
+- **Local ADB 端口错误** 🟡：移除对 ADB server 端口 5037 的无效尝试
+
+---
+
 ## [0.1.3] — 2026-05-26
 
 ### Fixed

@@ -241,11 +241,10 @@ object ShellExecutor {
     // ===== Local ADB (TCP, no TLS) =====
 
     private fun tryLocalAdb(): Boolean {
-        // Try multiple addresses: localhost, emulator host alias, and common ADB ports
+        // Try multiple addresses: localhost and emulator host alias
         val addresses = listOf(
             "127.0.0.1" to 5555,
-            "10.0.2.2" to 5555,  // Emulator host alias
-            "10.0.2.2" to 5037   // ADB server default port
+            "10.0.2.2" to 5555   // Emulator host alias (ADB forwarded port)
         )
         
         for ((host, port) in addresses) {
