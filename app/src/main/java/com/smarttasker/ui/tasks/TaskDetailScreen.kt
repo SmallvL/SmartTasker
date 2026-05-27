@@ -74,7 +74,6 @@ fun TaskDetailScreen(
                 SmartCard {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            Text(task!!.name, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
                             if (task!!.description.isNotEmpty()) Text(task!!.description, fontSize = 14.sp, color = SmartColors.textSecondary())
                         }
                         StatusPill(

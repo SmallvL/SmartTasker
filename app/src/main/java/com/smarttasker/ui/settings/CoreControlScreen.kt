@@ -156,9 +156,9 @@ fun CoreControlScreen(
 
             DiagnosticItem(
                 label = "开发者选项",
-                ok = deviceStatus.developerOptionsOn,
+                ok = deviceStatus.developerOptionsOn || shellMode == ShellExecutor.ShellMode.ADB_LOCAL,
                 okText = "已开启",
-                failText = "未开启",
+                failText = if (shellMode == ShellExecutor.ShellMode.ADB_LOCAL) "ADB 本地模式" else "未开启",
                 action = {
                     try { context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     catch (_: Exception) { context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -168,9 +168,9 @@ fun CoreControlScreen(
 
             DiagnosticItem(
                 label = "无线调试",
-                ok = deviceStatus.wirelessDebuggingOn,
+                ok = deviceStatus.wirelessDebuggingOn || shellMode == ShellExecutor.ShellMode.ADB_LOCAL,
                 okText = "已开启",
-                failText = "未开启",
+                failText = if (shellMode == ShellExecutor.ShellMode.ADB_LOCAL) "ADB 本地模式" else "未开启",
                 enabled = deviceStatus.developerOptionsOn,
                 action = {
                     try { context.startActivity(Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }

@@ -54,7 +54,10 @@ fun PermissionDoctorScreen(
                     is CoreStatus.Unknown -> CheckStatus.CHECKING
                 },
                 detail = when (coreStatus) {
-                    is CoreStatus.Running -> "端口 ${(coreStatus as CoreStatus.Running).port} · 完全控制"
+                    is CoreStatus.Running -> {
+                        val port = (coreStatus as CoreStatus.Running).port
+                        if (port > 0) "端口 $port · 完全控制" else "ADB 本地模式 · 完全控制"
+                    }
                     is CoreStatus.ShellOnly -> "SH 模式 · 执行可用 · 录制需无线调试"
                     is CoreStatus.Stopped -> "Core 未运行"
                     is CoreStatus.Error -> (coreStatus as CoreStatus.Error).message
