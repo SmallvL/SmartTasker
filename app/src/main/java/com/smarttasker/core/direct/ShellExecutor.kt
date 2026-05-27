@@ -183,6 +183,14 @@ object ShellExecutor {
     }
 
     /**
+     * Get the local ADB client (for streaming commands like getevent via ADB_LOCAL).
+     * Returns null if not in ADB_LOCAL mode.
+     */
+    fun getLocalAdbClient(): ShellAdbClient? {
+        return if (cachedMode == ShellMode.ADB_LOCAL) localAdbClient else null
+    }
+
+    /**
      * Force re-detection.
      */
     fun resetCache() {

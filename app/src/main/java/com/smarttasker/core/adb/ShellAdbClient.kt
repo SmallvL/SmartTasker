@@ -2,8 +2,11 @@ package com.smarttasker.core.adb
 
 import com.smarttasker.util.DebugLog
 import java.io.Closeable
+import java.io.InputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
@@ -218,6 +221,126 @@ class ShellAdbClient(
         }
     }
 
+    /**
+     * Open a streaming shell session via a NEW nc process.
+     * Returns a Pair of (InputStream with raw command output, Closeable to terminate).
+     * The InputStream yields raw bytes from WRTE payloads as they arrive.
+     * Returns null on failure.
+     */
+    fun streamShell(command: String): Pair<InputStream, Closeable>? {
+        try {
+            DebugLog.d("ShellAdb", "streamShell: starting nc for '$command'")
+            val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", "nc $host $port"))
+            val procInput = DataInputStream(proc.inputStream)
+            val procOutput = DataOutputStream(proc.outputStream)
+
+            Thread.sleep(100)
+
+            // CNXN handshake
+            sendMsgTo(procOutput, CMD_CNXN, A_VERSION, MAX_PAYLOAD, CONNECT_STRING.toByteArray())
+            val resp = readMsgFrom(procInput) ?: run {
+                DebugLog.d("ShellAdb", "streamShell: CNXN timeout")
+                proc.destroy()
+                return null
+            }
+            when (resp.cmd) {
+                CMD_AUTH -> {
+                    sendMsgTo(procOutput, CMD_AUTH, AUTH_TYPE_TOKEN, 0, ByteArray(0))
+                    val authResp = readMsgFrom(procInput) ?: run {
+                        DebugLog.d("ShellAdb", "streamShell: AUTH timeout")
+                        proc.destroy()
+                        return null
+                    }
+                    if (authResp.cmd != CMD_CNXN) {
+                        DebugLog.d("ShellAdb", "streamShell: AUTH failed, got 0x${authResp.cmd.toString(16)}")
+                        proc.destroy()
+                        return null
+                    }
+                }
+                CMD_CNXN -> { /* connected */ }
+                else -> {
+                    DebugLog.d("ShellAdb", "streamShell: unexpected response 0x${resp.cmd.toString(16)}")
+                    proc.destroy()
+                    return null
+                }
+            }
+            DebugLog.d("ShellAdb", "streamShell: CNXN OK, opening shell:$command")
+
+            // OPEN shell channel
+            val localId = 1
+            sendMsgTo(procOutput, CMD_OPEN, localId, 0, "shell:$command".toByteArray())
+
+            // Wait for OKAY
+            var remoteId = 0
+            while (true) {
+                val msg = readMsgFrom(procInput) ?: run {
+                    DebugLog.d("ShellAdb", "streamShell: OPEN timeout")
+                    proc.destroy()
+                    return null
+                }
+                when (msg.cmd) {
+                    CMD_OKAY -> {
+                        remoteId = msg.arg1
+                        DebugLog.d("ShellAdb", "streamShell: OKAY remoteId=$remoteId")
+                        break
+                    }
+                    CMD_CLSE -> {
+                        DebugLog.d("ShellAdb", "streamShell: CLSE during OPEN — command failed")
+                        proc.destroy()
+                        return null
+                    }
+                    else -> { /* skip early WRTE */ }
+                }
+            }
+
+            // Bridge ADB protocol → raw InputStream via PipedStream pair
+            val pipedOut = PipedOutputStream()
+            val pipedIn = PipedInputStream(pipedOut, 128 * 1024)
+
+            val capturedLocalId = localId
+            val capturedRemoteId = remoteId
+            val readerThread = Thread {
+                try {
+                    while (!Thread.currentThread().isInterrupted) {
+                        val msg = readMsgFrom(procInput) ?: break
+                        when (msg.cmd) {
+                            CMD_WRTE -> {
+                                if (msg.payload.isNotEmpty()) {
+                                    pipedOut.write(msg.payload)
+                                    pipedOut.flush()
+                                }
+                                sendMsgTo(procOutput, CMD_OKAY, capturedLocalId, capturedRemoteId, ByteArray(0))
+                            }
+                            CMD_CLSE -> {
+                                sendMsgTo(procOutput, CMD_CLSE, capturedLocalId, capturedRemoteId, ByteArray(0))
+                                break
+                            }
+                            else -> { /* ignore */ }
+                        }
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    runCatching { pipedOut.close() }
+                    runCatching { proc.destroy() }
+                }
+            }
+            readerThread.isDaemon = true
+            readerThread.name = "ShellAdb-stream-$command"
+            readerThread.start()
+
+            val closer = Closeable {
+                readerThread.interrupt()
+                runCatching { proc.destroy() }
+                runCatching { pipedOut.close() }
+            }
+
+            return Pair(pipedIn, closer)
+        } catch (e: Exception) {
+            DebugLog.d("ShellAdb", "streamShell error: ${e.message}")
+            return null
+        }
+    }
+
     // ===== Protocol =====
 
     private fun sendMsg(cmd: Int, arg0: Int, arg1: Int, payload: ByteArray) {
@@ -254,6 +377,44 @@ class ShellAdbClient(
         } else ByteArray(0)
 
         return AdbMessage(cmd, arg0, arg1, payload)
+    }
+
+    /** Send ADB message to a specific output stream (for streamShell's separate nc process). */
+    private fun sendMsgTo(out: DataOutputStream, cmd: Int, arg0: Int, arg1: Int, payload: ByteArray) {
+        val msg = ByteArray(24 + payload.size)
+        val buf = ByteBuffer.wrap(msg).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putInt(cmd)
+        buf.putInt(arg0)
+        buf.putInt(arg1)
+        buf.putInt(payload.size)
+        buf.putInt(checksum(payload))
+        buf.putInt(cmd xor 0xFFFFFFFF.toInt())
+        buf.put(payload)
+        out.write(msg)
+        out.flush()
+    }
+
+    /** Read ADB message from a specific input stream (for streamShell's separate nc process). */
+    private fun readMsgFrom(inp: DataInputStream): AdbMessage? {
+        return try {
+            val header = ByteArray(24)
+            inp.readFully(header)
+            val buf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
+            val cmd = buf.int
+            val arg0 = buf.int
+            val arg1 = buf.int
+            val length = buf.int
+            val checksum = buf.int
+            val magic = buf.int
+            val payload = if (length > 0) {
+                val data = ByteArray(length)
+                inp.readFully(data)
+                data
+            } else ByteArray(0)
+            AdbMessage(cmd, arg0, arg1, payload)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun nextId(): Int = localId++
