@@ -40,21 +40,21 @@ fun TaskDetailScreen(
 
     LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
-    if (task == null) {
+    val taskData = task ?: run {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(task!!.name, fontWeight = FontWeight.SemiBold) },
+            title = { Text(taskData.name, fontWeight = FontWeight.SemiBold) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回") } },
             actions = {
                 IconButton(onClick = {
                     coroutineScope.launch {
                         // Cancel any pending alarm before deleting
-                        AlarmScheduler.cancelAlarm(context, task!!.taskId)
-                        taskRepo.deleteTask(task!!)
+                        AlarmScheduler.cancelAlarm(context, taskData.taskId)
+                        taskRepo.deleteTask(taskData)
                         onBack()
                     }
                 }) {
@@ -74,52 +74,52 @@ fun TaskDetailScreen(
                 SmartCard {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            if (task!!.description.isNotEmpty()) Text(task!!.description, fontSize = 14.sp, color = SmartColors.textSecondary())
+                            if (taskData.description.isNotEmpty()) Text(taskData.description, fontSize = 14.sp, color = SmartColors.textSecondary())
                         }
                         StatusPill(
-                            when(task!!.status) { "active"->"运行中"; "paused"->"已暂停"; "draft"->"草稿"; else->task!!.status },
-                            when(task!!.status) { "active"->SmartColors.success(); "paused"->SmartColors.warning(); else->SmartColors.textTertiary() }
+                            when(taskData.status) { "active"->"运行中"; "paused"->"已暂停"; "draft"->"草稿"; else->taskData.status },
+                            when(taskData.status) { "active"->SmartColors.success(); "paused"->SmartColors.warning(); else->SmartColors.textTertiary() }
                         )
                     }
                     Spacer(Modifier.height(16.dp))
-                    DetailRow("目标应用", task!!.targetAppName.ifEmpty { "未设置" })
-                    DetailRow("触发方式", when(task!!.triggerType) { "schedule"->"定时 ${task!!.triggerTime}"; "notification"->"通知触发"; else->"手动执行" })
-                    DetailRow("风险等级", when(task!!.riskLevel) { "low"->"低"; "medium"->"中"; "high"->"高"; else->task!!.riskLevel })
+                    DetailRow("目标应用", taskData.targetAppName.ifEmpty { "未设置" })
+                    DetailRow("触发方式", when(taskData.triggerType) { "schedule"->"定时 ${taskData.triggerTime}"; "notification"->"通知触发"; else->"手动执行" })
+                    DetailRow("风险等级", when(taskData.riskLevel) { "low"->"低"; "medium"->"中"; "high"->"高"; else->taskData.riskLevel })
                 }
             }
 
             // Actions
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { onStartTrial(task!!) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16),
+                    Button(onClick = { onStartTrial(taskData) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16),
                         colors = ButtonDefaults.buttonColors(containerColor = SmartColors.accent())) {
                         Icon(Icons.Outlined.PlayArrow, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("试跑")
                     }
                     OutlinedButton(
                         onClick = {
                             coroutineScope.launch {
-                                val wasActive = task!!.status == "active"
+                                val wasActive = taskData.status == "active"
                                 if (wasActive) {
-                                    taskRepo.pauseTask(task!!)
+                                    taskRepo.pauseTask(taskData)
                                     // Cancel alarm when pausing
-                                    if (task!!.triggerType == "schedule") {
-                                        AlarmScheduler.cancelAlarm(context, task!!.taskId)
+                                    if (taskData.triggerType == "schedule") {
+                                        AlarmScheduler.cancelAlarm(context, taskData.taskId)
                                     }
                                 } else {
-                                    taskRepo.activateTask(task!!)
+                                    taskRepo.activateTask(taskData)
                                     // Schedule alarm when activating a scheduled task
-                                    if (task!!.triggerType == "schedule") {
-                                        val publishedRoute = routeRepo.getLatestPublishedRoute(task!!.taskId)
-                                        AlarmScheduler.scheduleAlarm(context, task!!, publishedRoute?.routeId ?: "")
+                                    if (taskData.triggerType == "schedule") {
+                                        val publishedRoute = routeRepo.getLatestPublishedRoute(taskData.taskId)
+                                        AlarmScheduler.scheduleAlarm(context, taskData, publishedRoute?.routeId ?: "")
                                     }
                                 }
-                                task = task!!.copy(status = if (wasActive) "paused" else "active")
+                                task = taskData.copy(status = if (wasActive) "paused" else "active")
                             }
                         },
                         modifier = Modifier.weight(1f), shape = RoundedCornerShape(16)
                     ) {
-                        Icon(if (task!!.status == "active") Icons.Outlined.Pause else Icons.Outlined.PlayArrow, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp)); Text(if (task!!.status == "active") "暂停" else "启用")
+                        Icon(if (taskData.status == "active") Icons.Outlined.Pause else Icons.Outlined.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp)); Text(if (taskData.status == "active") "暂停" else "启用")
                     }
                 }
             }

@@ -87,7 +87,12 @@ class RecordingOverlayService : Service() {
         val adbExecutor = com.smarttasker.core.direct.ShellExecutor.getAdbExecutor()
         sessionManager = RecordingSessionManager(applicationContext, adbExecutor)
         scope.launch {
-            val ok = sessionManager!!.startRecording()
+            val manager = sessionManager ?: run {
+                DebugLog.e("RecOverlay", "Session manager is null")
+                stopSelf()
+                return@launch
+            }
+            val ok = manager.startRecording()
             if (ok) {
                 startTime = System.currentTimeMillis()
                 showOverlay()

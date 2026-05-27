@@ -127,7 +127,7 @@ fun ImportExportScreen(
             }
 
             // Export result
-            if (exportResult != null) {
+            exportResult?.let { result ->
                 item {
                     SmartCard {
                         Row(
@@ -135,12 +135,12 @@ fun ImportExportScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                if (exportResult!!.startsWith("成功")) Icons.Outlined.CheckCircle else Icons.Outlined.Error,
+                                if (result.startsWith("成功")) Icons.Outlined.CheckCircle else Icons.Outlined.Error,
                                 contentDescription = null,
-                                tint = if (exportResult!!.startsWith("成功")) SmartColors.success() else SmartColors.danger(),
+                                tint = if (result.startsWith("成功")) SmartColors.success() else SmartColors.danger(),
                                 modifier = Modifier.size(24.dp)
                             )
-                            Text(exportResult!!, fontSize = 14.sp)
+                            Text(result, fontSize = 14.sp)
                         }
                     }
                 }
@@ -182,7 +182,7 @@ fun ImportExportScreen(
             }
 
             // Import result
-            if (importResult != null) {
+            importResult?.let { result ->
                 item {
                     SmartCard {
                         Row(
@@ -190,14 +190,14 @@ fun ImportExportScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                if (importResult!!.startsWith("成功")) Icons.Outlined.CheckCircle else Icons.Outlined.Error,
+                                if (result.startsWith("成功")) Icons.Outlined.CheckCircle else Icons.Outlined.Error,
                                 contentDescription = null,
-                                tint = if (importResult!!.startsWith("成功")) SmartColors.success() else SmartColors.danger(),
+                                tint = if (result.startsWith("成功")) SmartColors.success() else SmartColors.danger(),
                                 modifier = Modifier.size(24.dp)
                             )
-                            Text(importResult!!, fontSize = 14.sp)
+                            Text(result, fontSize = 14.sp)
                         }
-                        if (importResult!!.startsWith("成功")) {
+                        if (result.startsWith("成功")) {
                             Spacer(Modifier.height(12.dp))
                             SmartButton(
                                 text = "重启应用",
@@ -253,7 +253,7 @@ fun ImportExportScreen(
     }
 
     // Import confirmation dialog
-    if (showImportConfirmDialog != null) {
+    showImportConfirmDialog?.let { uri ->
         AlertDialog(
             onDismissRequest = { showImportConfirmDialog = null },
             title = { Text("确认导入") },
@@ -261,7 +261,6 @@ fun ImportExportScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val uri = showImportConfirmDialog!!
                         showImportConfirmDialog = null
                         isImporting = true
                         importResult = null

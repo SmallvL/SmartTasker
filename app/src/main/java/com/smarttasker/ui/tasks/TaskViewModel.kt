@@ -7,7 +7,9 @@ import com.smarttasker.data.entity.TaskEntity
 import com.smarttasker.data.repository.TaskRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+ 
 /**
  * ViewModel for task list management.
  * Bridges Room DB (TaskRepository) ↔ Compose UI (TasksPage).
@@ -58,16 +60,12 @@ class TaskViewModel(private val taskRepo: TaskRepository) : ViewModel() {
         _currentFilter.value = filter
     }
 
-    fun createQuickTask(input: String): TaskEntity? {
-        var task: TaskEntity? = null
-        viewModelScope.launch {
-            task = taskRepo.createTask(
-                name = input.take(20).ifBlank { "快速任务" },
-                description = input,
-                triggerType = "manual"
-            )
-        }
-        return task
+    suspend fun createQuickTask(input: String): TaskEntity {
+        return taskRepo.createTask(
+            name = input.take(20).ifBlank { "快速任务" },
+            description = input,
+            triggerType = "manual"
+        )
     }
 
     fun activateTask(taskId: String) {
