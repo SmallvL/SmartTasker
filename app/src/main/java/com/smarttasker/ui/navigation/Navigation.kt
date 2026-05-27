@@ -56,6 +56,7 @@ import com.smarttasker.ui.tasks.TaskViewModel
 import com.smarttasker.ui.settings.DeviceInfoScreen
 import com.smarttasker.ui.settings.ImportExportScreen
 import com.smarttasker.ui.settings.AboutScreen
+import com.smarttasker.schedule.AlarmScheduler
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -395,6 +396,10 @@ fun MainNavigation(
                                     routeRepo.publishRoute(route)
                                 }
                                 taskRepo.activateTask(task!!)
+                                // Schedule alarm if this is a scheduled task
+                                if (task!!.triggerType == "schedule") {
+                                    AlarmScheduler.scheduleAlarm(ctx, task!!, routeId)
+                                }
                                 navController.navigate(Screen.Home.route) { popUpTo(Screen.Home.route) { inclusive = true } }
                             }
                         },

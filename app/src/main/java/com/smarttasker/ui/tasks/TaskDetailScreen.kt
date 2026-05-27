@@ -18,6 +18,7 @@ import com.smarttasker.data.repository.RunRepository
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
+import com.smarttasker.schedule.AlarmScheduler
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +36,7 @@ fun TaskDetailScreen(
     val runs by runRepo.getRunsForTask(taskId).collectAsState(initial = emptyList())
     val routes by routeRepo.getRouteVersions(taskId).collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
@@ -48,7 +50,14 @@ fun TaskDetailScreen(
             title = { Text(task!!.name, fontWeight = FontWeight.SemiBold) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回") } },
             actions = {
-                IconButton(onClick = { coroutineScope.launch { taskRepo.deleteTask(task!!); onBack() } }) {
+                IconButton(onClick = {
+                    coroutineScope.launch {
+                        // Cancel any pending alarm before deleting
+                        AlarmScheduler.cancelAlarm(context, task!!.taskId)
+                        taskRepo.deleteTask(task!!)
+                        onBack()
+                    }
+                }) {
                     Icon(Icons.Outlined.Delete, contentDescription = "删除", tint = SmartColors.danger())
                 }
             },
@@ -90,8 +99,22 @@ fun TaskDetailScreen(
                     OutlinedButton(
                         onClick = {
                             coroutineScope.launch {
-                                if (task!!.status == "active") taskRepo.pauseTask(task!!) else taskRepo.activateTask(task!!)
-                                task = task!!.copy(status = if (task!!.status == "active") "paused" else "active")
+                                val wasActive = task!!.status == "active"
+                                if (wasActive) {
+                                    taskRepo.pauseTask(task!!)
+                                    // Cancel alarm when pausing
+                                    if (task!!.triggerType == "schedule") {
+                                        AlarmScheduler.cancelAlarm(context, task!!.taskId)
+                                    }
+                                } else {
+                                    taskRepo.activateTask(task!!)
+                                    // Schedule alarm when activating a scheduled task
+                                    if (task!!.triggerType == "schedule") {
+                                        val publishedRoute = routeRepo.getLatestPublishedRoute(task!!.taskId)
+                                        AlarmScheduler.scheduleAlarm(context, task!!, publishedRoute?.routeId ?: "")
+                                    }
+                                }
+                                task = task!!.copy(status = if (wasActive) "paused" else "active")
                             }
                         },
                         modifier = Modifier.weight(1f), shape = RoundedCornerShape(16)

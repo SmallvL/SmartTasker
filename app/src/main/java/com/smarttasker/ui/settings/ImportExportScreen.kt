@@ -1,6 +1,9 @@
 package com.smarttasker.ui.settings
 
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -16,7 +19,6 @@ import androidx.compose.ui.unit.sp
 import com.smarttasker.data.repository.SettingsRepository
 import com.smarttasker.ui.common.SmartCard
 import com.smarttasker.ui.common.SmartButton
-import com.smarttasker.ui.common.SmartSecondaryButton
 import com.smarttasker.ui.theme.SmartColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,11 +36,24 @@ fun ImportExportScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var exportResult by remember { mutableStateOf<String?>(null) }
+    var importResult by remember { mutableStateOf<String?>(null) }
     var isExporting by remember { mutableStateOf(false) }
+    var isImporting by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showImportConfirmDialog by remember { mutableStateOf<Uri?>(null) }
+    var showRestartDialog by remember { mutableStateOf(false) }
+
+    // SAF file picker for import
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            showImportConfirmDialog = uri
+        }
+    }
 
     // Get DB file info
-    val dbPath = context.getDatabasePath("smarttask_db")
+    val dbPath = context.getDatabasePath("smarttask.db")
     val dbExists = dbPath?.exists() == true
     val dbSize = if (dbExists) dbPath.length() / 1024 else 0
 
@@ -150,10 +165,47 @@ fun ImportExportScreen(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        "将备份文件放入下载目录的 SmartTask 文件夹，命名为 smarttask_backup.db",
-                        fontSize = 13.sp, color = SmartColors.textTertiary()
+                    SmartButton(
+                        text = if (isImporting) "导入中..." else "选择备份文件",
+                        onClick = {
+                            importResult = null
+                            importLauncher.launch(arrayOf(
+                                "application/octet-stream",
+                                "application/x-sqlite3",
+                                "application/vnd.sqlite3"
+                            ))
+                        },
+                        enabled = !isImporting,
+                        icon = Icons.Outlined.FolderOpen
                     )
+                }
+            }
+
+            // Import result
+            if (importResult != null) {
+                item {
+                    SmartCard {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (importResult!!.startsWith("成功")) Icons.Outlined.CheckCircle else Icons.Outlined.Error,
+                                contentDescription = null,
+                                tint = if (importResult!!.startsWith("成功")) SmartColors.success() else SmartColors.danger(),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(importResult!!, fontSize = 14.sp)
+                        }
+                        if (importResult!!.startsWith("成功")) {
+                            Spacer(Modifier.height(12.dp))
+                            SmartButton(
+                                text = "重启应用",
+                                onClick = { showRestartDialog = true },
+                                icon = Icons.Outlined.Refresh
+                            )
+                        }
+                    }
                 }
             }
 
@@ -200,6 +252,56 @@ fun ImportExportScreen(
         }
     }
 
+    // Import confirmation dialog
+    if (showImportConfirmDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirmDialog = null },
+            title = { Text("确认导入") },
+            text = { Text("导入将覆盖当前所有任务和运行记录数据。建议先导出当前数据作为备份。\n\n导入后需要重启应用才能生效。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val uri = showImportConfirmDialog!!
+                        showImportConfirmDialog = null
+                        isImporting = true
+                        importResult = null
+                        scope.launch {
+                            val result = importDatabase(context, uri)
+                            importResult = result
+                            isImporting = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SmartColors.accent())
+                ) { Text("确认导入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirmDialog = null }) { Text("取消") }
+            }
+        )
+    }
+
+    // Restart confirmation dialog
+    if (showRestartDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestartDialog = false },
+            title = { Text("重启应用") },
+            text = { Text("导入的数据库将在重启后生效。点击确认将关闭应用，请手动重新打开。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRestartDialog = false
+                        // Kill the process — user must manually reopen the app
+                        Runtime.getRuntime().exit(0)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SmartColors.accent())
+                ) { Text("确认重启") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestartDialog = false }) { Text("稍后手动重启") }
+            }
+        )
+    }
+
     // Clear confirmation dialog
     if (showClearDialog) {
         AlertDialog(
@@ -234,7 +336,7 @@ private fun InfoRow(label: String, value: String) {
 
 private suspend fun exportDatabase(context: Context): String = withContext(Dispatchers.IO) {
     try {
-        val dbFile = context.getDatabasePath("smarttask_db")
+        val dbFile = context.getDatabasePath("smarttask.db")
         if (dbFile == null || !dbFile.exists()) {
             return@withContext "错误：数据库文件不存在"
         }
@@ -257,6 +359,61 @@ private suspend fun exportDatabase(context: Context): String = withContext(Dispa
         if (shmFile.exists()) shmFile.copyTo(File(backupDir, "smarttask_backup_$timestamp.db-shm"), overwrite = true)
 
         "成功：已导出到 ${backupFile.absolutePath}"
+    } catch (e: Exception) {
+        "错误：${e.message}"
+    }
+}
+
+/**
+ * Import a database from the given URI.
+ * Validates the file is a SQLite database, closes the existing Room instance,
+ * copies the file to the app's databases directory, and removes WAL/SHM files.
+ */
+private suspend fun importDatabase(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
+    try {
+        // Validate the file by reading the SQLite header (magic bytes: "SQLite format 3\000")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val header = ByteArray(16)
+            val bytesRead = input.read(header)
+            if (bytesRead < 16) {
+                return@withContext "错误：文件太小，不是有效的数据库文件"
+            }
+            val magic = String(header, Charsets.US_ASCII)
+            if (!magic.startsWith("SQLite format 3")) {
+                return@withContext "错误：不是有效的 SQLite 数据库文件"
+            }
+        } ?: return@withContext "错误：无法读取所选文件"
+
+        // Close the existing Room database to release file locks
+        try {
+            val db = com.smarttasker.data.database.AppDatabase.getInstance(context)
+            db.close()
+            // Clear the singleton so next access creates a new instance
+            val field = com.smarttasker.data.database.AppDatabase.Companion::class.java
+                .getDeclaredField("INSTANCE")
+            field.isAccessible = true
+            field.set(null, null)
+        } catch (e: Exception) {
+            android.util.Log.w("ImportExport", "Could not close existing DB: ${e.message}")
+        }
+
+        val dbFile = context.getDatabasePath("smarttask.db")
+        dbFile.parentFile?.mkdirs()
+
+        // Copy the imported file to the databases directory
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            dbFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        } ?: return@withContext "错误：无法读取所选文件"
+
+        // Delete WAL and SHM files to avoid conflicts
+        val walFile = File(dbFile.parent, "${dbFile.name}-wal")
+        val shmFile = File(dbFile.parent, "${dbFile.name}-shm")
+        if (walFile.exists()) walFile.delete()
+        if (shmFile.exists()) shmFile.delete()
+
+        "成功：数据库已导入，请重启应用以生效"
     } catch (e: Exception) {
         "错误：${e.message}"
     }
