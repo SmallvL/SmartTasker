@@ -12,6 +12,17 @@
 
 ---
 
+## [0.3.0] — 2026-05-27
+
+### Added
+- **ShellAdbClient** — 通过 `nc` 管道传输 ADB 二进制协议，绕过 Android `untrusted_app` 对 Java Socket 的 ECONNREFUSED 限制
+- **ADB_LOCAL 模式** — 模拟器中 App 可通过 IPv6 (`::1:5555`) 连接 adbd，获得完整 shell 执行能力（截图、录制、input）
+- 模拟器 root adb 支持验证通过
+
+### Fixed
+- ADB OKAY 响应 arg0 不匹配问题（接受任何 OKAY 而非严格匹配 localId）
+- ShellExecutor 本地 ADB 检测切换到 ShellAdbClient
+
 ## [0.1.1] — 2026-05-26
 
 ### Added
