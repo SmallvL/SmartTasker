@@ -40,6 +40,20 @@
 
 ---
 
+## [0.1.5] — 2026-05-27
+
+### Changed
+- **SH 模式状态区分** 🔴：不再显示"Core 运行中"，改为"基础模式"黄色状态
+- **功能徽章**：首页显示 `✅ 路线执行` 和 `⚠️ 需无线调试` 两个能力徽章
+- **SH 模式说明卡片**：显示"基础模式 · 路线执行可用"，明确说明录制需要无线调试或 Root
+- **CoreStatus 新增 `ShellOnly` 状态**：区分 SH 模式（基础执行）和 ADB/Root（完全控制）
+- **DeviceStatusChecker**：新增 `canRecord`/`canExecute`/`shellAvailable` 字段
+- **CoreControlScreen**：SH 模式显示"SH 模式 · 执行可用·录制不可用"
+- **PermissionDoctor**：SH 模式显示为 WARN 状态
+- **DeviceInfoScreen**：SH 模式显示"基础模式"，UI dump 按钮在 SH 模式下可用
+
+---
+
 ## [0.1.4] — 2026-05-26
 
 ### Fixed

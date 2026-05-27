@@ -162,6 +162,11 @@ fun DeviceInfoScreen(
                                     text = "Core 已连接",
                                     color = SmartColors.success()
                                 )
+                            } else if (coreStatus is CoreStatus.ShellOnly) {
+                                StatusPill(
+                                    text = "基础模式",
+                                    color = SmartColors.warning()
+                                )
                             } else {
                                 StatusPill(
                                     text = "Core 未连接",
@@ -217,7 +222,7 @@ fun DeviceInfoScreen(
                                 }
                             },
                             icon = Icons.Outlined.AccountTree,
-                            enabled = !isLoadingHierarchy && coreStatus is CoreStatus.Running
+                            enabled = !isLoadingHierarchy && (coreStatus is CoreStatus.Running || coreStatus is CoreStatus.ShellOnly)
                         )
 
                         if (isLoadingHierarchy) {

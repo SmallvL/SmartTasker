@@ -436,7 +436,9 @@ private fun OverallStatusCard(
     shellMode: ShellExecutor.ShellMode,
     deviceStatus: DeviceStatusChecker.FullStatus
 ) {
-    val isRunning = coreStatus is CoreStatus.Running || deviceStatus.coreRunning
+    val isRunning = coreStatus is CoreStatus.Running
+    val isShellOnly = coreStatus is CoreStatus.ShellOnly
+    val isOperational = isRunning || isShellOnly
     SmartCard {
         Row(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -444,22 +446,30 @@ private fun OverallStatusCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (isRunning) Icons.Outlined.CheckCircle else Icons.Outlined.PowerSettingsNew,
+                imageVector = if (isOperational) Icons.Outlined.CheckCircle else Icons.Outlined.PowerSettingsNew,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = if (isRunning) SmartColors.success() else SmartColors.warning()
+                tint = if (isRunning) SmartColors.success() else if (isShellOnly) SmartColors.warning() else SmartColors.warning()
             )
             Column {
                 Text(
-                    if (isRunning) "Core 运行中" else "Core 未运行",
+                    when {
+                        isRunning -> "Core 运行中"
+                        isShellOnly -> "基础模式"
+                        else -> "Core 未运行"
+                    },
                     fontWeight = FontWeight.Bold, fontSize = 20.sp,
-                    color = if (isRunning) SmartColors.success() else SmartColors.warning()
+                    color = when {
+                        isRunning -> SmartColors.success()
+                        isShellOnly -> SmartColors.warning()
+                        else -> SmartColors.warning()
+                    }
                 )
                 Spacer(Modifier.height(4.dp))
                 when {
-                    deviceStatus.activeMode == "root" -> StatusPill("Root 模式", SmartColors.success())
-                    deviceStatus.activeMode == "adb" -> StatusPill("ADB 模式", SmartColors.accent())
-                    deviceStatus.coreRunning -> StatusPill("Shell 模式", SmartColors.accent())
+                    deviceStatus.activeMode == "root" -> StatusPill("Root 模式 · 完全控制", SmartColors.success())
+                    deviceStatus.activeMode == "adb" -> StatusPill("ADB 模式 · 完全控制", SmartColors.accent())
+                    deviceStatus.activeMode == "sh" -> StatusPill("SH 模式 · 执行可用·录制不可用", SmartColors.warning())
                     !deviceStatus.developerOptionsOn -> StatusPill("需要开启开发者选项", SmartColors.danger())
                     !deviceStatus.wirelessDebuggingOn -> StatusPill("需要开启无线调试", SmartColors.warning())
                     !deviceStatus.hasSavedEndpoint -> StatusPill("需要配对", SmartColors.warning())

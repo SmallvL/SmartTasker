@@ -26,8 +26,11 @@ class DeviceStatusChecker(private val context: Context) {
         val adbPortReachable: Boolean = false,
         val adbConnected: Boolean = false,
         val rootAvailable: Boolean = false,
+        val shellAvailable: Boolean = false,
         val coreRunning: Boolean = false,
-        val activeMode: String = "none", // "root", "adb", "none"
+        val activeMode: String = "none", // "root", "adb", "sh", "none"
+        val canRecord: Boolean = false,   // needs ADB or root
+        val canExecute: Boolean = false,  // SH mode is enough
         val lastCheckTime: Long = 0,
         val isChecking: Boolean = false
     )
@@ -56,7 +59,9 @@ class DeviceStatusChecker(private val context: Context) {
         val rootAvail = tryRoot()
         // Port is reachable if ADB is already connected (TLS/TCP) OR raw TCP connects
         val portReachable = if (adbConnected) true else if (hasEndpoint) isPortReachable(endpoint) else false
-        val running = adbConnected || rootAvail || shellAvailable
+        val coreRunning = adbConnected || rootAvail  // SH mode is NOT "core running"
+        val canRecord = adbConnected || rootAvail     // getevent needs ADB or root
+        val canExecute = adbConnected || rootAvail || shellAvailable  // tap/swipe/input works in SH
         val mode = when {
             rootAvail -> "root"
             adbConnected -> "adb"
@@ -72,8 +77,11 @@ class DeviceStatusChecker(private val context: Context) {
             adbPortReachable = portReachable,
             adbConnected = adbConnected,
             rootAvailable = rootAvail,
-            coreRunning = running,
+            shellAvailable = shellAvailable,
+            coreRunning = coreRunning,
             activeMode = mode,
+            canRecord = canRecord,
+            canExecute = canExecute,
             lastCheckTime = System.currentTimeMillis(),
             isChecking = false
         )
@@ -95,7 +103,9 @@ class DeviceStatusChecker(private val context: Context) {
             it == com.smarttasker.core.direct.ShellExecutor.ShellMode.SH
         }
         val rootAvail = tryRoot()
-        val running = adbConnected || rootAvail || shellAvailable
+        val coreRunning = adbConnected || rootAvail
+        val canRecord = adbConnected || rootAvail
+        val canExecute = adbConnected || rootAvail || shellAvailable
         val mode = when {
             rootAvail -> "root"
             adbConnected -> "adb"
@@ -115,8 +125,11 @@ class DeviceStatusChecker(private val context: Context) {
             adbConnected = adbConnected,
             adbPortReachable = portReachable,
             rootAvailable = rootAvail,
-            coreRunning = running,
+            shellAvailable = shellAvailable,
+            coreRunning = coreRunning,
             activeMode = mode,
+            canRecord = canRecord,
+            canExecute = canExecute,
             lastCheckTime = System.currentTimeMillis()
         )
     }

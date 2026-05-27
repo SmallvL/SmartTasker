@@ -207,6 +207,9 @@ class CoreBridgeManager private constructor(private val context: Context) {
                         pid = result.pid
                     )
                 }
+                is CoreStatusResult.ShellOnly -> {
+                    _coreStatus.value = CoreStatus.ShellOnly(mode = result.mode)
+                }
                 is CoreStatusResult.Stopped -> {
                     _coreStatus.value = CoreStatus.Stopped(result.reason)
                 }
@@ -251,18 +254,32 @@ class CoreBridgeManager private constructor(private val context: Context) {
 sealed class CoreStatus {
     object Unknown : CoreStatus()
     data class Running(val port: Int, val pid: Int) : CoreStatus()
+    /**
+     * Shell-only mode (SH): can execute basic commands (tap/swipe/input/launch)
+     * but CANNOT record (getevent) or take screenshots (screencap).
+     * Needs wireless ADB or root for full capabilities.
+     */
+    data class ShellOnly(val mode: String = "sh") : CoreStatus()
     data class Stopped(val reason: String) : CoreStatus()
     data class Error(val message: String) : CoreStatus()
 
     val isRunning: Boolean get() = this is Running
+    val isShellOnly: Boolean get() = this is ShellOnly
+    /** Can execute routes (tap/swipe/input) */
+    val canExecute: Boolean get() = this is Running || this is ShellOnly
+    /** Can record (needs ADB TLS or root for getevent) */
+    val canRecord: Boolean get() = this is Running
+
     val displayText: String get() = when (this) {
         is Unknown -> "检查中..."
         is Running -> "Core 运行中"
+        is ShellOnly -> "基础模式"
         is Stopped -> "Core 未运行"
         is Error -> "连接异常"
     }
     val statusColor: String get() = when (this) {
         is Running -> "success"
+        is ShellOnly -> "warning"
         is Stopped -> "warning"
         is Error -> "danger"
         is Unknown -> "neutral"
