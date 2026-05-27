@@ -41,10 +41,11 @@ class CoreBridgeManager private constructor(private val context: Context) {
     val isReconnecting: StateFlow<Boolean> = _isReconnecting.asStateFlow()
 
     // Parsers
-    private val llmParser = LlmTaskSpecParser(
+    private var _llmParser = LlmTaskSpecParser(
         apiUrl = "https://api.openai.com/v1",
         apiKey = ""  // Will be loaded from settings
     )
+    private val _llmConfigured = MutableStateFlow(false)
 
     // ===== Reactive State =====
 
@@ -159,7 +160,17 @@ class CoreBridgeManager private constructor(private val context: Context) {
      * Update LLM configuration for AI task parsing.
      */
     fun configureLlm(apiKey: String, baseUrl: String, model: String = "gpt-4o-mini") {
-        // Will be implemented with DataStore integration
+        if (apiKey.isNotBlank()) {
+            _llmParser = LlmTaskSpecParser(
+                apiUrl = baseUrl,
+                apiKey = apiKey,
+                model = model
+            )
+            _llmConfigured.value = true
+            DebugLog.i("CoreMgr", "LLM configured: model=$model url=$baseUrl")
+        } else {
+            _llmConfigured.value = false
+        }
     }
 
     /**
@@ -170,7 +181,12 @@ class CoreBridgeManager private constructor(private val context: Context) {
     /**
      * Get the LLM-enhanced task spec parser.
      */
-    fun getLlmParser(): LlmTaskSpecParser = llmParser
+    fun getLlmParser(): LlmTaskSpecParser = _llmParser
+
+    /**
+     * Check if LLM is configured.
+     */
+    fun isLlmConfigured(): Boolean = _llmConfigured.value
 
     // ===== Status Polling =====
 

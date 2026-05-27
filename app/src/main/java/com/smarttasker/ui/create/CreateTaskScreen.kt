@@ -19,6 +19,7 @@ import com.smarttasker.core.bridge.CoreBridgeManager
 import com.smarttasker.core.parser.TaskSpec
 import com.smarttasker.core.parser.TaskSpecParser
 import com.smarttasker.data.entity.TaskEntity
+import com.smarttasker.data.repository.SettingsRepository
 import com.smarttasker.data.repository.TaskRepository
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
@@ -37,6 +38,7 @@ data class ChatMessage(
 fun CreateTaskScreen(
     taskRepo: TaskRepository,
     coreBridgeManager: CoreBridgeManager,
+    settingsRepo: SettingsRepository,
     initialInput: String = "",
     onTaskCreated: (TaskEntity) -> Unit,
     onCancel: () -> Unit
@@ -48,7 +50,19 @@ fun CreateTaskScreen(
     var showConfirm by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
-    val parser = coreBridgeManager.getTaskSpecParser()
+    // LLM config from settings
+    val apiKey by settingsRepo.apiKey.collectAsState(initial = "")
+    val apiUrl by settingsRepo.apiUrl.collectAsState(initial = "https://api.openai.com/v1/chat/completions")
+    val modelName by settingsRepo.modelName.collectAsState(initial = "gpt-4o-mini")
+    val useLlm = apiKey.isNotBlank()
+
+    val ruleParser = coreBridgeManager.getTaskSpecParser()
+    val llmParser = remember(apiKey, apiUrl, modelName) {
+        if (apiKey.isNotBlank()) {
+            coreBridgeManager.configureLlm(apiKey, apiUrl, modelName)
+            coreBridgeManager.getLlmParser()
+        } else null
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top bar
@@ -58,6 +72,13 @@ fun CreateTaskScreen(
                 IconButton(onClick = onCancel) {
                     Icon(Icons.Outlined.Close, contentDescription = "取消")
                 }
+            },
+            actions = {
+                StatusPill(
+                    if (useLlm) "AI: $modelName" else "规则解析",
+                    if (useLlm) SmartColors.accent() else SmartColors.textTertiary()
+                )
+                Spacer(Modifier.width(16.dp))
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background
@@ -165,9 +186,14 @@ fun CreateTaskScreen(
                                 isAnalyzing = true
                                 errorMessage = null
 
-                                // Use real TaskSpecParser
+                                // Use LLM parser if configured, fallback to rule-based
                                 try {
-                                    when (val result = parser.parse(input)) {
+                                    val result = if (useLlm && llmParser != null) {
+                                        llmParser.parse(input)
+                                    } else {
+                                        ruleParser.parse(input)
+                                    }
+                                    when (result) {
                                         is TaskSpecParser.ParseResult.Success -> {
                                             val spec = result.spec
                                             taskSpec = spec

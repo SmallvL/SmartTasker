@@ -40,6 +40,20 @@
 
 ---
 
+## [0.2.0] — 2026-05-27
+
+### Added — Epic C: AI 任务创建
+- **LLM 解析器接入**：CreateTaskScreen 自动检测 API Key 配置，有则用 LLM 解析，无则用规则解析
+- **解析器状态标签**：创建任务页右上角显示 `AI: gpt-4o-mini`（LLM 模式）或 `规则解析`（规则模式）
+- **CoreBridgeManager.configureLlm()** 实现：运行时更新 LLM 解析器配置
+- **设置联动**：模型配置页保存的 API Key/URL/Model 自动同步到任务解析
+
+### Changed
+- `CreateTaskScreen` 新增 `settingsRepo` 参数，实时读取 LLM 配置
+- `Navigation` 传递 `settingsRepo` 到 `CreateTaskScreen`
+
+---
+
 ## [0.1.5] — 2026-05-27
 
 ### Changed

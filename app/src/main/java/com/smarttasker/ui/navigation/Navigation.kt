@@ -257,6 +257,7 @@ fun MainNavigation(
                 CreateTaskScreen(
                     taskRepo = taskRepo,
                     coreBridgeManager = coreBridgeManager,
+                    settingsRepo = settingsRepo,
                     initialInput = java.net.URLDecoder.decode(initialInput, "UTF-8"),
                     onTaskCreated = { task ->
                         scope.launch {
