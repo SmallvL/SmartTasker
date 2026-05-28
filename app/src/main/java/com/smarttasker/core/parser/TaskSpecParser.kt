@@ -68,7 +68,7 @@ object TaskSpecParser {
      * Parse natural language input into a TaskSpec.
      */
     fun parse(input: String): ParseResult {
-        val trimmed = input.trim()
+        val trimmed = input.replace(Regex("[\\r\\n]+"), "").trim()
         if (trimmed.isBlank()) return ParseResult.Error("请输入任务描述")
 
         // Check forbidden

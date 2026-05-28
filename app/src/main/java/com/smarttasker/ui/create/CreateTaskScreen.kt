@@ -189,10 +189,11 @@ fun CreateTaskScreen(
                     )
                     FilledIconButton(
                         onClick = {
-                            if (userInput.isNotBlank()) {
-                                val userMsg = ChatMessage(isUser = true, content = userInput)
+                            val cleanInput = userInput.replace(Regex("[\\r\\n]+"), "").trim()
+                            if (cleanInput.isNotBlank()) {
+                                val userMsg = ChatMessage(isUser = true, content = cleanInput)
                                 messages = messages + userMsg
-                                val input = userInput
+                                val input = cleanInput
                                 userInput = ""
                                 isAnalyzing = true
                                 errorMessage = null
@@ -314,7 +315,7 @@ private fun WelcomeCard(onExampleClick: (String) -> Unit) {
                 "打开设置检查系统更新"
             ).forEach { example ->
                 Surface(
-                    onClick = { onExampleClick(example) },
+                    onClick = { onExampleClick(example.replace(Regex("[\\r\\n]+"), "")) },
                     shape = RoundedCornerShape(12),
                     color = SmartColors.accent().copy(alpha = 0.08f)
                 ) {

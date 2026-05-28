@@ -44,6 +44,7 @@ fun TaskDetailScreen(
     var editDescription by remember { mutableStateOf("") }
     var editTargetApp by remember { mutableStateOf("") }
     var editTriggerType by remember { mutableStateOf("manual") }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
@@ -118,6 +119,32 @@ fun TaskDetailScreen(
         )
     }
 
+    // Delete confirmation dialog
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除任务") },
+            text = { Text("确定要删除任务 \"${taskData.name}\" 吗？此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    coroutineScope.launch {
+                        AlarmScheduler.cancelAlarm(context, taskData.taskId)
+                        taskRepo.deleteTask(taskData)
+                        showDeleteConfirm = false
+                        onBack()
+                    }
+                }) {
+                    Text("删除", color = SmartColors.danger())
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(taskData.name, fontWeight = FontWeight.SemiBold) },
@@ -132,13 +159,7 @@ fun TaskDetailScreen(
                 }) {
                     Icon(Icons.Outlined.Edit, contentDescription = "编辑")
                 }
-                IconButton(onClick = {
-                    coroutineScope.launch {
-                        AlarmScheduler.cancelAlarm(context, taskData.taskId)
-                        taskRepo.deleteTask(taskData)
-                        onBack()
-                    }
-                }) {
+                IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(Icons.Outlined.Delete, contentDescription = "删除", tint = SmartColors.danger())
                 }
             },
