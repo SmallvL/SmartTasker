@@ -184,33 +184,94 @@ class TaskExecutionService(
         taskId: String,
         routeSteps: List<RouteStepEntity>
     ): ExecutionResult {
+        val runId = "run_${System.currentTimeMillis()}"
         _executionState.value = ExecutionState.Running(taskId, "回放路线", 0f)
         
         // Convert steps back to AutoLXB route JSON
         val routeJson = RouteAdapter.toRouteJson(routeSteps)
         
+        val startTime = System.currentTimeMillis()
         val result = bridge.runRoute(taskId, routeJson)
+        val durationMs = System.currentTimeMillis() - startTime
+        
         return when (result) {
             is RouteRunResult.Success -> {
                 _executionState.value = ExecutionState.Completed(taskId)
+                
+                // Collect trace for the successful run
+                val trace = collectTrace(taskId)
+                
+                // Save success run record
+                val runRecord = RunRecordEntity(
+                    runId = runId,
+                    taskId = taskId,
+                    status = "success",
+                    durationMs = durationMs,
+                    modelCalls = 0,
+                    diagnosisSummary = "路线回放成功",
+                    diagnosisSuggestion = "路线执行完成",
+                    routeSnapshot = routeJson,
+                    retryCount = 0
+                )
+                runRepository.insertRun(runRecord)
+                DebugLog.i("TaskExec", "路线回放成功, runId=$runId, duration=${durationMs}ms")
+                
                 ExecutionResult.Success(
                     taskId = taskId,
                     routeJson = routeJson,
                     steps = routeSteps,
-                    traceLines = emptyList()
+                    traceLines = trace ?: emptyList()
                 )
             }
             is RouteRunResult.Failed -> {
                 _executionState.value = ExecutionState.Error("步骤 ${result.stepIndex}: ${result.reason}")
+                
+                // Collect trace for the failed run
+                val trace = collectTrace(taskId)
+                
+                // Save failed run record
+                val runRecord = RunRecordEntity(
+                    runId = runId,
+                    taskId = taskId,
+                    status = "failed",
+                    durationMs = durationMs,
+                    modelCalls = 0,
+                    failedStepId = result.stepIndex?.toString(),
+                    failureType = "route_step_failed",
+                    diagnosisSummary = "路线执行失败: 步骤 ${result.stepIndex}",
+                    diagnosisSuggestion = result.reason,
+                    routeSnapshot = routeJson,
+                    retryCount = 0
+                )
+                runRepository.insertRun(runRecord)
+                DebugLog.w("TaskExec", "路线回放失败, runId=$runId, step=${result.stepIndex}, reason=${result.reason}")
+                
                 ExecutionResult.Failed(
                     taskId = taskId,
                     reason = "步骤 ${result.stepIndex}: ${result.reason}",
-                    traceLines = emptyList(),
+                    traceLines = trace ?: emptyList(),
                     diagnosis = Pair("路线执行失败", result.reason)
                 )
             }
             is RouteRunResult.Error -> {
                 _executionState.value = ExecutionState.Error(result.message)
+                
+                // Save error run record
+                val runRecord = RunRecordEntity(
+                    runId = runId,
+                    taskId = taskId,
+                    status = "failed",
+                    durationMs = durationMs,
+                    modelCalls = 0,
+                    failureType = "route_error",
+                    diagnosisSummary = "路线执行错误",
+                    diagnosisSuggestion = result.message,
+                    routeSnapshot = routeJson,
+                    retryCount = 0
+                )
+                runRepository.insertRun(runRecord)
+                DebugLog.e("TaskExec", "路线执行错误, runId=$runId, error=${result.message}")
+                
                 ExecutionResult.Error(result.message)
             }
         }
