@@ -35,6 +35,8 @@ interface CoreBridge {
 
 sealed class CoreStatusResult {
     data class Running(val port: Int, val pid: Int) : CoreStatusResult()
+    /** Shell-only mode: basic commands work but no recording/screenshot */
+    data class ShellOnly(val mode: String = "sh") : CoreStatusResult()
     data class Stopped(val reason: String) : CoreStatusResult()
     data class Error(val code: CoreErrorCode, val message: String) : CoreStatusResult()
 }

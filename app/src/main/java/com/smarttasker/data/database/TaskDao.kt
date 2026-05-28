@@ -18,6 +18,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE triggerType = :type ORDER BY updatedAt DESC")
     fun getTasksByTrigger(type: String): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE triggerType = :type ORDER BY updatedAt DESC")
+    suspend fun getTasksByTriggerSync(type: String): List<TaskEntity>
+
     @Query("SELECT * FROM tasks WHERE taskId = :taskId")
     suspend fun getTaskById(taskId: String): TaskEntity?
 

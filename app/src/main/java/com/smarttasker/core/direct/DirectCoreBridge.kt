@@ -22,8 +22,8 @@ class DirectCoreBridge(private val context: Context) : CoreBridge {
         when (mode) {
             ShellExecutor.ShellMode.ROOT,
             ShellExecutor.ShellMode.ADB,
-            ShellExecutor.ShellMode.ADB_LOCAL,
-            ShellExecutor.ShellMode.SH -> CoreStatusResult.Running(port = 0, pid = android.os.Process.myPid())
+            ShellExecutor.ShellMode.ADB_LOCAL -> CoreStatusResult.Running(port = 0, pid = android.os.Process.myPid())
+            ShellExecutor.ShellMode.SH -> CoreStatusResult.ShellOnly()
             ShellExecutor.ShellMode.NONE -> CoreStatusResult.Stopped("需要 Root 权限或 ADB 调试")
         }
     }

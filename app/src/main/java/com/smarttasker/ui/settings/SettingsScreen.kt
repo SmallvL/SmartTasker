@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.ui.common.SmartCard
@@ -50,45 +51,45 @@ fun SettingsScreen(
 
         item {
             Text("权限与安全", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 16.dp))
         }
         item {
             SmartCard {
                 SettingsItem(Icons.Outlined.Security, "权限体检", "检查运行环境", onClick = onNavigateToPermissions)
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.Shield, "安全策略", "高风险动作确认", onClick = onNavigateToSafetyPolicy)
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.HealthAndSafety, "成本预算", "模型调用费用", onClick = onNavigateToCostBudget)
             }
         }
 
         item {
             Text("AI 配置", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 16.dp))
         }
         item {
             SmartCard {
                 SettingsItem(Icons.Outlined.SmartToy, "模型配置", "API 地址和密钥", onClick = onNavigateToModelConfig)
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.Psychology, "Prompt 设置", "自定义提示词", onClick = onNavigateToPromptSettings)
             }
         }
 
         item {
             Text("Core 引擎", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 16.dp))
         }
         item {
             SmartCard {
                 SettingsItem(Icons.Outlined.PowerSettingsNew, "Core 启动", "启动/停止自动化引擎", onClick = onNavigateToCoreStart)
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.PhoneAndroid, "设备连接", "ADB 无线调试", onClick = onNavigateToDeviceInfo)
             }
         }
 
         item {
             Text("通用", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 16.dp))
         }
         item {
             SmartCard {
@@ -112,11 +113,11 @@ fun SettingsScreen(
                         )
                     )
                 }
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.ImportExport, "导入导出", "备份和恢复数据", onClick = onNavigateToImportExport)
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.BugReport, "Debug 日志", "查看运行日志", onClick = onNavigateToDebugLog)
-                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 12.dp))
+                Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
                 SettingsItem(Icons.Outlined.Info, "关于", "版本 1.0.0", onClick = onNavigateToAbout)
             }
         }
@@ -130,7 +131,7 @@ private fun SettingsItem(icon: ImageVector, title: String, subtitle: String, onC
             .fillMaxWidth()
             .clip(RoundedCornerShape(12))
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

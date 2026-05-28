@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RouteDao {
+    @Query("SELECT * FROM route_versions ORDER BY createdAt DESC")
+    fun getAllRoutes(): Flow<List<RouteVersionEntity>>
+
     @Query("SELECT * FROM route_versions WHERE taskId = :taskId ORDER BY createdAt DESC")
     fun getRouteVersions(taskId: String): Flow<List<RouteVersionEntity>>
 
@@ -42,4 +45,16 @@ interface RouteDao {
 
     @Query("DELETE FROM route_steps WHERE routeId = :routeId")
     suspend fun deleteAllSteps(routeId: String)
+
+    @Query("DELETE FROM route_versions WHERE routeId = :routeId")
+    suspend fun deleteRouteVersion(routeId: String)
+
+    @androidx.room.Transaction
+    suspend fun replaceAllSteps(routeId: String, steps: List<RouteStepEntity>) {
+        deleteAllSteps(routeId)
+        insertSteps(steps)
+    }
+
+    @Query("UPDATE route_steps SET stepIndex = :newIndex WHERE stepId = :stepId")
+    suspend fun reindexStep(stepId: String, newIndex: Int)
 }

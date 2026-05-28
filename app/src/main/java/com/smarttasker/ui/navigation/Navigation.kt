@@ -36,6 +36,7 @@ import com.smarttasker.ui.runs.RunListScreen
 import com.smarttasker.ui.settings.SettingsScreen
 import com.smarttasker.ui.create.CreateTaskScreen
 import com.smarttasker.ui.trialrun.TrialRunScreen
+import com.smarttasker.ui.trialrun.TrialStepStatus
 import com.smarttasker.ui.trialrun.TrialModeSelectScreen
 import com.smarttasker.ui.trialrun.ManualRecordingScreen
 import com.smarttasker.ui.trialrun.RouteLearningResultScreen
@@ -55,6 +56,7 @@ import com.smarttasker.ui.tasks.TaskViewModel
 import com.smarttasker.ui.settings.DeviceInfoScreen
 import com.smarttasker.ui.settings.ImportExportScreen
 import com.smarttasker.ui.settings.AboutScreen
+import com.smarttasker.schedule.AlarmScheduler
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -256,6 +258,7 @@ fun MainNavigation(
                 CreateTaskScreen(
                     taskRepo = taskRepo,
                     coreBridgeManager = coreBridgeManager,
+                    settingsRepo = settingsRepo,
                     initialInput = java.net.URLDecoder.decode(initialInput, "UTF-8"),
                     onTaskCreated = { task ->
                         scope.launch {
@@ -281,7 +284,7 @@ fun MainNavigation(
                     runRepo = runRepo,
                     routeRepo = routeRepo,
                     onBack = { navController.popBackStack() },
-                    onOpenRouteStudio = { routeId -> navController.navigate("route_studio/$routeId/${java.net.URLEncoder.encode(taskId, "UTF-8")}?taskName=${java.net.URLEncoder.encode(taskId, "UTF-8")}") },
+                    onOpenRouteStudio = { routeId, taskName -> navController.navigate("route_studio/$routeId/${java.net.URLEncoder.encode(taskId, "UTF-8")}?taskName=${java.net.URLEncoder.encode(taskName, "UTF-8")}") },
                     onStartTrial = { task -> navController.navigate("trial/${task.taskId}") }
                 )
             }
@@ -322,8 +325,27 @@ fun MainNavigation(
                                 task = task!!,
                                 executionService = executionService,
                                 onComplete = { steps ->
-                                    navController.navigate("learning_result/${task!!.taskId}") {
-                                        popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                    scope.launch {
+                                        val typeSummaries = steps
+                                            .filter { it.status == TrialStepStatus.SUCCESS }
+                                            .map { step ->
+                                                // Infer step type from summary
+                                                val type = when {
+                                                    step.summary.contains("打开") -> "open_app"
+                                                    step.summary.contains("输入") || step.summary.contains("搜索") -> "input"
+                                                    step.summary.contains("滑动") -> "swipe"
+                                                    step.summary.contains("等待") -> "wait"
+                                                    step.summary.contains("返回") -> "back"
+                                                    else -> "tap"
+                                                }
+                                                type to step.summary
+                                            }
+                                        val routeId = if (typeSummaries.isNotEmpty()) {
+                                            routeRepo.saveFromTrialSteps(task!!.taskId, typeSummaries)
+                                        } else ""
+                                        navController.navigate("learning_result/${task!!.taskId}?routeId=$routeId") {
+                                            popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                        }
                                     }
                                 },
                                 onCancel = { navController.popBackStack() }
@@ -333,8 +355,11 @@ fun MainNavigation(
                             ManualRecordingScreen(
                                 task = task!!,
                                 onRecordingComplete = { routeDraft ->
-                                    navController.navigate("learning_result/${task!!.taskId}") {
-                                        popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                    scope.launch {
+                                        val routeId = routeRepo.saveFromDraft(routeDraft, task!!.taskId)
+                                        navController.navigate("learning_result/${task!!.taskId}?routeId=$routeId") {
+                                            popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                        }
                                     }
                                 },
                                 onCancel = { navController.popBackStack() }
@@ -346,25 +371,54 @@ fun MainNavigation(
 
             // ===== Learning Result =====
             composable(
-                "learning_result/{taskId}",
-                arguments = listOf(navArgument("taskId") { type = NavType.StringType })
+                "learning_result/{taskId}?routeId={routeId}",
+                arguments = listOf(
+                    navArgument("taskId") { type = NavType.StringType },
+                    navArgument("routeId") { type = NavType.StringType; defaultValue = "" }
+                )
             ) { backStackEntry ->
                 val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+                val routeId = backStackEntry.arguments?.getString("routeId") ?: ""
                 var task by remember { mutableStateOf<TaskEntity?>(null) }
+                val ctx = androidx.compose.ui.platform.LocalContext.current
                 LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
                 if (task != null) {
                     RouteLearningResultScreen(
                         task = task!!,
-                        steps = emptyList(),
+                        routeId = routeId,
+                        routeRepo = routeRepo,
                         onSaveAndEnable = {
                             scope.launch {
+                                // Publish route first
+                                val route = routeRepo.getRouteById(routeId)
+                                if (route != null) {
+                                    routeRepo.publishRoute(route)
+                                }
                                 taskRepo.activateTask(task!!)
+                                // Schedule alarm if this is a scheduled task
+                                if (task!!.triggerType == "schedule") {
+                                    AlarmScheduler.scheduleAlarm(ctx, task!!, routeId)
+                                }
                                 navController.navigate(Screen.Home.route) { popUpTo(Screen.Home.route) { inclusive = true } }
                             }
                         },
-                        onOpenRouteStudio = { navController.popBackStack() },
-                        onDiscard = { navController.popBackStack() }
+                        onOpenRouteStudio = { rid ->
+                            navController.navigate("route_studio/$rid/${task!!.taskId}?taskName=${java.net.URLEncoder.encode(task!!.name, "UTF-8")}")
+                        },
+                        onDiscard = {
+                            scope.launch {
+                                if (routeId.isNotEmpty()) {
+                                    // Clean up DB
+                                    routeRepo.deleteRoute(routeId)
+                                    // Clean up draft files
+                                    try {
+                                        com.smarttasker.core.record.RouteDraftStore(ctx).delete(routeId)
+                                    } catch (_: Exception) {}
+                                }
+                                navController.popBackStack()
+                            }
+                        }
                     )
                 }
             }

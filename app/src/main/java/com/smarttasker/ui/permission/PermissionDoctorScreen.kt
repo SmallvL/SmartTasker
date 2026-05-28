@@ -48,12 +48,17 @@ fun PermissionDoctorScreen(
             "core_status" -> check.copy(
                 status = when (coreStatus) {
                     is CoreStatus.Running -> CheckStatus.PASS
+                    is CoreStatus.ShellOnly -> CheckStatus.WARN
                     is CoreStatus.Stopped -> CheckStatus.FAIL
                     is CoreStatus.Error -> CheckStatus.FAIL
                     is CoreStatus.Unknown -> CheckStatus.CHECKING
                 },
                 detail = when (coreStatus) {
-                    is CoreStatus.Running -> "端口 ${(coreStatus as CoreStatus.Running).port}"
+                    is CoreStatus.Running -> {
+                        val port = (coreStatus as CoreStatus.Running).port
+                        if (port > 0) "端口 $port · 完全控制" else "ADB 本地模式 · 完全控制"
+                    }
+                    is CoreStatus.ShellOnly -> "SH 模式 · 执行可用 · 录制需无线调试"
                     is CoreStatus.Stopped -> "Core 未运行"
                     is CoreStatus.Error -> (coreStatus as CoreStatus.Error).message
                     is CoreStatus.Unknown -> "检查中..."

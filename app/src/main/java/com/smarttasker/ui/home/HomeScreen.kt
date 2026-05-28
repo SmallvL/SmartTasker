@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.core.bridge.CoreBridgeManager
@@ -62,7 +63,9 @@ fun HomeScreen(
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.5).sp
-                        )
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (isChecking) {
                         CircularProgressIndicator(
@@ -79,6 +82,44 @@ fun HomeScreen(
                     Spacer(Modifier.width(8.dp))
                     // Permission status (simplified for now)
                     StatusPill("权限正常", SmartColors.success())
+                }
+                Spacer(Modifier.height(8.dp))
+                // Capability badges
+                CapabilityBadges(coreStatus)
+            }
+        }
+
+        // Shell-only mode info card
+        if (coreStatus is CoreStatus.ShellOnly) {
+            item {
+                SmartCard(
+                    onClick = onNavigateToSettings,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = SmartColors.warning(),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("基础模式 · 路线执行可用", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                            Text(
+                                "当前通过 SH 模式运行，路线回放正常。\n录制和截图需要无线调试或 Root 权限。",
+                                fontSize = 13.sp,
+                                color = SmartColors.textSecondary(),
+                                lineHeight = 18.sp
+                            )
+                        }
+                        Icon(
+                            Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            tint = SmartColors.textTertiary()
+                        )
+                    }
                 }
             }
         }
@@ -198,11 +239,28 @@ fun HomeScreen(
 private fun CoreStatusPill(status: CoreStatus) {
     val (text, color) = when (status) {
         is CoreStatus.Running -> "Core 运行中" to SmartColors.success()
+        is CoreStatus.ShellOnly -> "基础模式" to SmartColors.warning()
         is CoreStatus.Stopped -> "Core 未运行" to SmartColors.warning()
         is CoreStatus.Error -> "连接异常" to SmartColors.danger()
         is CoreStatus.Unknown -> "检查中..." to SmartColors.textTertiary()
     }
     StatusPill(text, color)
+}
+
+@Composable
+private fun CapabilityBadges(status: CoreStatus) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Execution capability
+        StatusPill(
+            if (status.canExecute) "✅ 路线执行" else "❌ 路线执行",
+            if (status.canExecute) SmartColors.success() else SmartColors.textTertiary()
+        )
+        // Recording capability
+        StatusPill(
+            if (status.canRecord) "✅ 录制" else "⚠️ 需无线调试",
+            if (status.canRecord) SmartColors.success() else SmartColors.warning()
+        )
+    }
 }
 
 @Composable

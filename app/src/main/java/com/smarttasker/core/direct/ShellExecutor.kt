@@ -2,7 +2,7 @@ package com.smarttasker.core.direct
 
 import android.content.Context
 import android.os.Build
-import com.smarttasker.core.adb.AdbClient
+import com.smarttasker.core.adb.ShellAdbClient
 import com.smarttasker.core.adb.AdbShellExecutor
 import com.smarttasker.util.DebugLog
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +22,7 @@ object ShellExecutor {
 
     private var cachedMode: ShellMode? = null
     private var adbExecutor: AdbShellExecutor? = null
-    private var localAdbClient: AdbClient? = null
+    private var localAdbClient: ShellAdbClient? = null
     private var cachedSuPath: String = "su"
 
     /**
@@ -183,6 +183,14 @@ object ShellExecutor {
     }
 
     /**
+     * Get the local ADB client (for streaming commands like getevent via ADB_LOCAL).
+     * Returns null if not in ADB_LOCAL mode.
+     */
+    fun getLocalAdbClient(): ShellAdbClient? {
+        return if (cachedMode == ShellMode.ADB_LOCAL) localAdbClient else null
+    }
+
+    /**
      * Force re-detection.
      */
     fun resetCache() {
@@ -241,24 +249,28 @@ object ShellExecutor {
     // ===== Local ADB (TCP, no TLS) =====
 
     private fun tryLocalAdb(): Boolean {
-        // Try multiple addresses: localhost, emulator host alias, and common ADB ports
+        // Try multiple addresses: IPv6 localhost first, then IPv4, then emulator host alias
         val addresses = listOf(
-            "127.0.0.1" to 5555,
-            "10.0.2.2" to 5555,  // Emulator host alias
-            "10.0.2.2" to 5037   // ADB server default port
+            "::1" to 5555,       // IPv6 localhost (emulator adbd listens on :::5555)
+            "127.0.0.1" to 5555, // IPv4 localhost
+            "10.0.2.2" to 5555   // Emulator host alias (ADB forwarded port)
         )
         
         for ((host, port) in addresses) {
             try {
-                val client = AdbClient(host, port, 3000)
+                val client = ShellAdbClient(host, port, 3000)
                 val ok = client.connect()
                 if (ok) {
-                    val test = try { client.shell("echo ok").trim() } catch (_: Exception) { "" }
+                    val test = try { client.shell("echo ok").trim() } catch (e: Exception) {
+                        DebugLog.d("ShellExec", "Local ADB shell test exception for $host:$port: ${e.message}")
+                        ""
+                    }
                     if (test == "ok") {
                         localAdbClient = client
                         DebugLog.i("ShellExec", "Local ADB TCP connected to $host:$port")
                         return true
                     } else {
+                        DebugLog.d("ShellExec", "Local ADB shell test failed for $host:$port: test='$test'")
                         client.close()
                     }
                 } else {
@@ -279,7 +291,7 @@ object ShellExecutor {
             ShellResult.Success(output)
         } catch (e: Exception) {
             try {
-                val newClient = AdbClient("127.0.0.1", 5555, 5000)
+                val newClient = ShellAdbClient("::1", 5555, 5000)
                 if (newClient.connect()) {
                     localAdbClient = newClient
                     val output = newClient.shell(command)

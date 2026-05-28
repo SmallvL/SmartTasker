@@ -20,7 +20,7 @@ import java.io.InputStreamReader
  * For getevent streaming, priority order:
  * 1. ROOT (su -c getevent -lt)
  * 2. ADB TLS (AdbShellExecutor.openShellStream) — real device wireless debugging
- * 3. ADB binary path (adb shell getevent -lt) — if adb binary found
+ * 3. ADB_LOCAL (ShellAdbClient.streamShell via nc pipe) — emulator / localhost:5555
  * 4. SH fallback (getevent -lt) — will fail on most devices without input group
  */
 class AdbStreamClient(private val adbExecutor: AdbShellExecutor? = null) {
@@ -91,7 +91,45 @@ class AdbStreamClient(private val adbExecutor: AdbShellExecutor? = null) {
             DebugLog.w("AdbStream", "ADB TLS not connected (adbExecutor=${adbExecutor != null}, connected=${adbExecutor?.isConnected()})")
         }
 
-        // Priority 3: Try Runtime.exec with sh
+        // Priority 3: ADB_LOCAL mode (ShellAdbClient via nc pipe — emulator / localhost:5555)
+        if (ShellExecutor.getMode() == ShellMode.ADB_LOCAL) {
+            val localClient = ShellExecutor.getLocalAdbClient()
+            if (localClient != null) {
+                DebugLog.i("AdbStream", "Using ADB_LOCAL stream for getevent")
+                val result = localClient.streamShell("getevent -lt")
+                if (result != null) {
+                    val (inputStream, closer) = result
+                    DebugLog.i("AdbStream", "ADB_LOCAL stream opened, reading...")
+                    try {
+                        val reader = BufferedReader(InputStreamReader(inputStream))
+                        var line: String?
+                        var lineCount = 0
+                        while (reader.readLine().also { line = it } != null) {
+                            line?.let {
+                                lineCount++
+                                if (lineCount <= 20) DebugLog.i("AdbStream", "ADB_LOCAL line $lineCount: ${it.take(80)}")
+                                if (it.isNotBlank()) {
+                                    trySend(it)
+                                }
+                            }
+                        }
+                        DebugLog.w("AdbStream", "ADB_LOCAL getevent stream ended after $lineCount lines")
+                    } catch (e: Exception) {
+                        DebugLog.e("AdbStream", "ADB_LOCAL stream error: ${e.message}")
+                    } finally {
+                        closer.close()
+                    }
+                    awaitClose { closer.close() }
+                    return@callbackFlow
+                } else {
+                    DebugLog.w("AdbStream", "ADB_LOCAL streamShell returned null!")
+                }
+            } else {
+                DebugLog.w("AdbStream", "ADB_LOCAL mode but localAdbClient is null")
+            }
+        }
+
+        // Priority 4: Try Runtime.exec with sh
         DebugLog.i("AdbStream", "Using SH fallback: sh -c getevent -lt")
         val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "getevent -lt"))
         streamProcess(process, this)

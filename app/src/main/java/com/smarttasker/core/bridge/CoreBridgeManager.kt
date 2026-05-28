@@ -41,10 +41,11 @@ class CoreBridgeManager private constructor(private val context: Context) {
     val isReconnecting: StateFlow<Boolean> = _isReconnecting.asStateFlow()
 
     // Parsers
-    private val llmParser = LlmTaskSpecParser(
+    private var _llmParser = LlmTaskSpecParser(
         apiUrl = "https://api.openai.com/v1",
         apiKey = ""  // Will be loaded from settings
     )
+    private val _llmConfigured = MutableStateFlow(false)
 
     // ===== Reactive State =====
 
@@ -159,7 +160,17 @@ class CoreBridgeManager private constructor(private val context: Context) {
      * Update LLM configuration for AI task parsing.
      */
     fun configureLlm(apiKey: String, baseUrl: String, model: String = "gpt-4o-mini") {
-        // Will be implemented with DataStore integration
+        if (apiKey.isNotBlank()) {
+            _llmParser = LlmTaskSpecParser(
+                apiUrl = baseUrl,
+                apiKey = apiKey,
+                model = model
+            )
+            _llmConfigured.value = true
+            DebugLog.i("CoreMgr", "LLM configured: model=$model url=$baseUrl")
+        } else {
+            _llmConfigured.value = false
+        }
     }
 
     /**
@@ -170,7 +181,12 @@ class CoreBridgeManager private constructor(private val context: Context) {
     /**
      * Get the LLM-enhanced task spec parser.
      */
-    fun getLlmParser(): LlmTaskSpecParser = llmParser
+    fun getLlmParser(): LlmTaskSpecParser = _llmParser
+
+    /**
+     * Check if LLM is configured.
+     */
+    fun isLlmConfigured(): Boolean = _llmConfigured.value
 
     // ===== Status Polling =====
 
@@ -206,6 +222,9 @@ class CoreBridgeManager private constructor(private val context: Context) {
                         port = result.port,
                         pid = result.pid
                     )
+                }
+                is CoreStatusResult.ShellOnly -> {
+                    _coreStatus.value = CoreStatus.ShellOnly(mode = result.mode)
                 }
                 is CoreStatusResult.Stopped -> {
                     _coreStatus.value = CoreStatus.Stopped(result.reason)
@@ -251,18 +270,32 @@ class CoreBridgeManager private constructor(private val context: Context) {
 sealed class CoreStatus {
     object Unknown : CoreStatus()
     data class Running(val port: Int, val pid: Int) : CoreStatus()
+    /**
+     * Shell-only mode (SH): can execute basic commands (tap/swipe/input/launch)
+     * but CANNOT record (getevent) or take screenshots (screencap).
+     * Needs wireless ADB or root for full capabilities.
+     */
+    data class ShellOnly(val mode: String = "sh") : CoreStatus()
     data class Stopped(val reason: String) : CoreStatus()
     data class Error(val message: String) : CoreStatus()
 
     val isRunning: Boolean get() = this is Running
+    val isShellOnly: Boolean get() = this is ShellOnly
+    /** Can execute routes (tap/swipe/input) */
+    val canExecute: Boolean get() = this is Running || this is ShellOnly
+    /** Can record (needs ADB TLS or root for getevent) */
+    val canRecord: Boolean get() = this is Running
+
     val displayText: String get() = when (this) {
         is Unknown -> "检查中..."
         is Running -> "Core 运行中"
+        is ShellOnly -> "基础模式"
         is Stopped -> "Core 未运行"
         is Error -> "连接异常"
     }
     val statusColor: String get() = when (this) {
         is Running -> "success"
+        is ShellOnly -> "warning"
         is Stopped -> "warning"
         is Error -> "danger"
         is Unknown -> "neutral"

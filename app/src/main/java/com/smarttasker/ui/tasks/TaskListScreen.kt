@@ -92,7 +92,9 @@ private fun TaskCard(task: TaskEntity, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(task.name, fontWeight = FontWeight.Medium, fontSize = 16.sp)
                 Spacer(Modifier.height(4.dp))
-                Text(task.description.ifEmpty { "无描述" }, fontSize = 13.sp, color = SmartColors.textSecondary(), maxLines = 2)
+                if (task.description != task.name) {
+                    Text(task.description.ifEmpty { "无描述" }, fontSize = 13.sp, color = SmartColors.textSecondary(), maxLines = 2)
+                }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusPill(

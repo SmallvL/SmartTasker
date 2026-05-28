@@ -21,13 +21,16 @@ class SenseEngine(private val context: Context) {
     /**
      * Take a screenshot via screencap command.
      * Returns PNG bytes.
+     * Uses app-internal cache dir for SH mode compatibility.
      */
     suspend fun screenshot(): ScreenshotResult = withContext(Dispatchers.IO) {
         try {
-            val tmpFile = "/sdcard/.smarttask_screenshot.png"
+            // Use app-internal cache dir (writable in all modes including SH)
+            val cacheDir = context.cacheDir
+            val tmpFile = File(cacheDir, "screenshot_tmp.png")
 
-            // Take screenshot
-            val result = ShellExecutor.exec("screencap -p $tmpFile")
+            // Take screenshot to app-internal path
+            val result = ShellExecutor.exec("screencap -p ${tmpFile.absolutePath}")
             if (result is ShellResult.Error) {
                 return@withContext ScreenshotResult.Error(
                     CoreErrorCode.CORE_NOT_RUNNING,
@@ -35,21 +38,31 @@ class SenseEngine(private val context: Context) {
                 )
             }
 
-            // Read file via shell (cat) since we may not have direct file access
-            val catResult = ShellExecutor.exec("cat $tmpFile | base64")
-            if (catResult !is ShellResult.Success) {
-                return@withContext ScreenshotResult.Error(
-                    CoreErrorCode.CORE_NOT_RUNNING,
-                    "读取截图失败: ${(catResult as? ShellResult.Error)?.message ?: "未知错误"}"
-                )
+            // Read the file directly (we have full access to our own cache dir)
+            if (!tmpFile.exists() || tmpFile.length() == 0L) {
+                // Fallback: try reading via shell + base64
+                val catResult = ShellExecutor.exec("cat ${tmpFile.absolutePath} | base64")
+                if (catResult !is ShellResult.Success) {
+                    return@withContext ScreenshotResult.Error(
+                        CoreErrorCode.CORE_NOT_RUNNING,
+                        "读取截图失败: ${(catResult as? ShellResult.Error)?.message ?: "未知错误"}"
+                    )
+                }
+                val base64 = catResult.output.replace("\n", "").replace("\r", "")
+                val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+                tmpFile.delete()
+                if (bytes.isEmpty()) {
+                    return@withContext ScreenshotResult.Error(
+                        CoreErrorCode.CORE_NOT_RUNNING,
+                        "截图数据为空"
+                    )
+                }
+                return@withContext ScreenshotResult.Success(bytes)
             }
 
-            // Decode base64
-            val base64 = catResult.output.replace("\n", "").replace("\r", "")
-            val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
-
-            // Clean up
-            ShellExecutor.exec("rm -f $tmpFile")
+            // Direct file read (faster, no base64 overhead)
+            val bytes = tmpFile.readBytes()
+            tmpFile.delete()
 
             if (bytes.isEmpty()) {
                 return@withContext ScreenshotResult.Error(
@@ -66,14 +79,16 @@ class SenseEngine(private val context: Context) {
 
     /**
      * Dump UI hierarchy via uiautomator.
+     * Uses app-internal cache dir for SH mode compatibility.
      * Returns XML string.
      */
     suspend fun dumpHierarchy(): HierarchyResult = withContext(Dispatchers.IO) {
         try {
-            val tmpFile = "/sdcard/.smarttask_hierarchy.xml"
+            val cacheDir = context.cacheDir
+            val tmpFile = File(cacheDir, "hierarchy_tmp.xml")
 
             // Dump hierarchy
-            val result = ShellExecutor.exec("uiautomator dump $tmpFile")
+            val result = ShellExecutor.exec("uiautomator dump ${tmpFile.absolutePath}")
             if (result is ShellResult.Error) {
                 return@withContext HierarchyResult.Error(
                     CoreErrorCode.CORE_NOT_RUNNING,
@@ -81,19 +96,17 @@ class SenseEngine(private val context: Context) {
                 )
             }
 
-            // Read the XML file
-            val catResult = ShellExecutor.exec("cat $tmpFile")
-            if (catResult !is ShellResult.Success) {
+            // Read the XML file directly
+            if (!tmpFile.exists()) {
                 return@withContext HierarchyResult.Error(
                     CoreErrorCode.CORE_NOT_RUNNING,
-                    "读取 UI dump 失败: ${(catResult as? ShellResult.Error)?.message ?: "未知错误"}"
+                    "UI dump 文件不存在"
                 )
             }
 
-            // Clean up
-            ShellExecutor.exec("rm -f $tmpFile")
+            val xml = tmpFile.readText()
+            tmpFile.delete()
 
-            val xml = catResult.output
             if (xml.isBlank()) {
                 return@withContext HierarchyResult.Error(
                     CoreErrorCode.CORE_NOT_RUNNING,
@@ -143,9 +156,10 @@ class SenseEngine(private val context: Context) {
 
     /**
      * Launch an app by package name.
+     * Uses am start (works in SH mode) instead of monkey.
      */
     suspend fun launchApp(packageName: String): Boolean {
-        val result = ShellExecutor.exec("monkey -p $packageName -c android.intent.category.LAUNCHER 1")
+        val result = ShellExecutor.exec("am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $packageName")
         return result is ShellResult.Success
     }
 
