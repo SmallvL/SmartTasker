@@ -53,18 +53,27 @@ class ScreenshotManager(private val context: Context) {
                 "screenshot_${dateStr}.png"
             }
 
-            val file = File(screenshotDir, filename)
+            // screencap 需要一个 shell 用户可写的路径
+            // /data/local/tmp/ 对 shell、root、sh 均可写
+            val tmpDir = File("/data/local/tmp")
+            if (!tmpDir.exists()) tmpDir.mkdirs()
+            val tmpFile = File(tmpDir, "smarttasker_screencap_tmp.png")
 
-            // 使用 ADB screencap 命令截图
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "screencap -p ${file.absolutePath}"))
+            // 使用 ADB screencap 命令截图到共享临时目录
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "screencap -p ${tmpFile.absolutePath}"))
             val exitCode = process.waitFor()
 
-            if (exitCode == 0 && file.exists() && file.length() > 0) {
+            if (exitCode == 0 && tmpFile.exists() && tmpFile.length() > 0) {
+                // 截图成功后复制到应用私有目录进行管理
+                val file = File(screenshotDir, filename)
+                tmpFile.copyTo(file, overwrite = true)
+                tmpFile.delete()
                 Log.i(TAG, "Screenshot saved: ${file.absolutePath} (${file.length()} bytes)")
                 cleanupOldScreenshots()
                 ScreenshotResult.Success(file.absolutePath, timestamp)
             } else {
-                Log.e(TAG, "Screenshot failed: exitCode=$exitCode, fileExists=${file.exists()}, fileSize=${file.length()}")
+                Log.e(TAG, "Screenshot failed: exitCode=$exitCode, tmpExists=${tmpFile.exists()}, tmpSize=${tmpFile.length()}")
+                tmpFile.delete()
                 ScreenshotResult.Error("截图失败: exitCode=$exitCode")
             }
         } catch (e: Exception) {

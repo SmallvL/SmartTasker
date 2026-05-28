@@ -45,6 +45,7 @@ import com.smarttasker.ui.common.SmartSecondaryButton
 import com.smarttasker.ui.common.StatusPill
 import com.smarttasker.ui.theme.SmartColors
 import com.smarttasker.util.DebugLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -397,6 +398,9 @@ private suspend fun connectToSavedEndpoint(
                 onResult(false, "连接异常: ${e.message}")
             }
         }
+    } catch (e: CancellationException) {
+        DebugLog.w("CoreCtrl", "connectToSavedEndpoint cancelled (scope left composition)")
+        // Don't call onResult — scope is dead
     } catch (e: Exception) {
         DebugLog.e("CoreCtrl", "connectToSavedEndpoint outer error: ${e.message}")
         onResult(false, "连接异常: ${e.message}")

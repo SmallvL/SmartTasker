@@ -21,15 +21,18 @@ class SenseEngine(private val context: Context) {
     /**
      * Take a screenshot via screencap command.
      * Returns PNG bytes.
-     * Uses app-internal cache dir for SH mode compatibility.
+     * Uses /data/local/tmp/ for screencap output (writable by shell/root/sh).
+     * App-internal cache dir is NOT writable by the shell user in ADB mode.
      */
     suspend fun screenshot(): ScreenshotResult = withContext(Dispatchers.IO) {
         try {
-            // Use app-internal cache dir (writable in all modes including SH)
-            val cacheDir = context.cacheDir
-            val tmpFile = File(cacheDir, "screenshot_tmp.png")
+            // screencap 需要一个 shell 用户可写的路径
+            // /data/local/tmp/ 对 shell、root、sh 均可写
+            val tmpDir = File("/data/local/tmp")
+            if (!tmpDir.exists()) tmpDir.mkdirs()
+            val tmpFile = File(tmpDir, "smarttasker_screenshot_tmp.png")
 
-            // Take screenshot to app-internal path
+            // Take screenshot to shared tmp path
             val result = ShellExecutor.exec("screencap -p ${tmpFile.absolutePath}")
             if (result is ShellResult.Error) {
                 return@withContext ScreenshotResult.Error(
@@ -38,7 +41,7 @@ class SenseEngine(private val context: Context) {
                 )
             }
 
-            // Read the file directly (we have full access to our own cache dir)
+            // 读取截图文件（通过 shell 命令读取，因为 app 进程可能无权直接访问 /data/local/tmp/）
             if (!tmpFile.exists() || tmpFile.length() == 0L) {
                 // Fallback: try reading via shell + base64
                 val catResult = ShellExecutor.exec("cat ${tmpFile.absolutePath} | base64")
@@ -79,13 +82,15 @@ class SenseEngine(private val context: Context) {
 
     /**
      * Dump UI hierarchy via uiautomator.
-     * Uses app-internal cache dir for SH mode compatibility.
+     * Uses /data/local/tmp/ for dump output (writable by shell/root/sh).
      * Returns XML string.
      */
     suspend fun dumpHierarchy(): HierarchyResult = withContext(Dispatchers.IO) {
         try {
-            val cacheDir = context.cacheDir
-            val tmpFile = File(cacheDir, "hierarchy_tmp.xml")
+            // uiautomator dump 同样需要 shell 用户可写的路径
+            val tmpDir = File("/data/local/tmp")
+            if (!tmpDir.exists()) tmpDir.mkdirs()
+            val tmpFile = File(tmpDir, "smarttasker_hierarchy_tmp.xml")
 
             // Dump hierarchy
             val result = ShellExecutor.exec("uiautomator dump ${tmpFile.absolutePath}")
