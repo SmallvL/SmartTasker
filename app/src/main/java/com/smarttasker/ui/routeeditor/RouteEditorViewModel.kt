@@ -74,62 +74,72 @@ class RouteEditorViewModel(
     }
 
     /**
-     * 添加新步骤
+     * 添加新步骤（自动持久化）
      */
     fun addStep(type: String = "tap", summary: String = "") {
-        val currentSteps = _uiState.value.steps.toMutableList()
-        val newStep = RouteStepEntity(
-            stepId = java.util.UUID.randomUUID().toString().take(8),
-            routeId = routeId,
-            stepIndex = currentSteps.size,
-            type = type,
-            summary = summary.ifEmpty { "新步骤 ${currentSteps.size + 1}" }
-        )
-        currentSteps.add(newStep)
-        _uiState.value = _uiState.value.copy(steps = currentSteps)
+        viewModelScope.launch {
+            val currentSteps = _uiState.value.steps.toMutableList()
+            val newStep = RouteStepEntity(
+                stepId = java.util.UUID.randomUUID().toString().take(8),
+                routeId = routeId,
+                stepIndex = currentSteps.size,
+                type = type,
+                summary = summary.ifEmpty { "新步骤 ${currentSteps.size + 1}" }
+            )
+            currentSteps.add(newStep)
+            _uiState.value = _uiState.value.copy(steps = currentSteps)
+            routeRepo.updateRouteSteps(routeId, currentSteps)
+        }
     }
 
     /**
-     * 删除步骤
+     * 删除步骤（自动持久化）
      */
     fun deleteStep(stepIndex: Int) {
-        val currentSteps = _uiState.value.steps.toMutableList()
-        if (stepIndex in currentSteps.indices) {
-            currentSteps.removeAt(stepIndex)
-            // 更新步骤索引
-            val updatedSteps = currentSteps.mapIndexed { index, step ->
-                step.copy(stepIndex = index)
+        viewModelScope.launch {
+            val currentSteps = _uiState.value.steps.toMutableList()
+            if (stepIndex in currentSteps.indices) {
+                currentSteps.removeAt(stepIndex)
+                val updatedSteps = currentSteps.mapIndexed { index, step ->
+                    step.copy(stepIndex = index)
+                }
+                _uiState.value = _uiState.value.copy(steps = updatedSteps)
+                routeRepo.updateRouteSteps(routeId, updatedSteps)
             }
-            _uiState.value = _uiState.value.copy(steps = updatedSteps)
         }
     }
 
     /**
-     * 切换步骤启用状态
+     * 切换步骤启用状态（自动持久化）
      */
     fun toggleStepEnabled(stepIndex: Int) {
-        val currentSteps = _uiState.value.steps.toMutableList()
-        if (stepIndex in currentSteps.indices) {
-            currentSteps[stepIndex] = currentSteps[stepIndex].copy(
-                enabled = !currentSteps[stepIndex].enabled
-            )
-            _uiState.value = _uiState.value.copy(steps = currentSteps)
+        viewModelScope.launch {
+            val currentSteps = _uiState.value.steps.toMutableList()
+            if (stepIndex in currentSteps.indices) {
+                currentSteps[stepIndex] = currentSteps[stepIndex].copy(
+                    enabled = !currentSteps[stepIndex].enabled
+                )
+                _uiState.value = _uiState.value.copy(steps = currentSteps)
+                routeRepo.updateStep(currentSteps[stepIndex])
+            }
         }
     }
 
     /**
-     * 移动步骤位置
+     * 移动步骤位置（自动持久化）
      */
     fun moveStep(fromIndex: Int, toIndex: Int) {
-        val currentSteps = _uiState.value.steps.toMutableList()
-        if (fromIndex in currentSteps.indices && toIndex in currentSteps.indices) {
-            val step = currentSteps.removeAt(fromIndex)
-            currentSteps.add(toIndex, step)
-            // 更新步骤索引
-            val updatedSteps = currentSteps.mapIndexed { index, s ->
-                s.copy(stepIndex = index)
+        viewModelScope.launch {
+            val currentSteps = _uiState.value.steps.toMutableList()
+            if (fromIndex in currentSteps.indices && toIndex in currentSteps.indices) {
+                val step = currentSteps.removeAt(fromIndex)
+                currentSteps.add(toIndex, step)
+                val updatedSteps = currentSteps.mapIndexed { index, s ->
+                    s.copy(stepIndex = index)
+                }
+                _uiState.value = _uiState.value.copy(steps = updatedSteps)
+                routeRepo.updateRouteSteps(routeId, updatedSteps)
             }
-            _uiState.value = _uiState.value.copy(steps = updatedSteps)
         }
     }
 
@@ -148,18 +158,21 @@ class RouteEditorViewModel(
     }
 
     /**
-     * 更新步骤
+     * 更新步骤（自动持久化）
      */
     fun updateStep(stepIndex: Int, updatedStep: RouteStepEntity) {
-        val currentSteps = _uiState.value.steps.toMutableList()
-        if (stepIndex in currentSteps.indices) {
-            currentSteps[stepIndex] = updatedStep
-            _uiState.value = _uiState.value.copy(
-                steps = currentSteps,
-                showStepEditDialog = false,
-                editingStep = null,
-                selectedStepIndex = -1
-            )
+        viewModelScope.launch {
+            val currentSteps = _uiState.value.steps.toMutableList()
+            if (stepIndex in currentSteps.indices) {
+                currentSteps[stepIndex] = updatedStep
+                _uiState.value = _uiState.value.copy(
+                    steps = currentSteps,
+                    showStepEditDialog = false,
+                    editingStep = null,
+                    selectedStepIndex = -1
+                )
+                routeRepo.updateStep(updatedStep)
+            }
         }
     }
 

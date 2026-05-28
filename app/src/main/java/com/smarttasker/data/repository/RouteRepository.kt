@@ -145,15 +145,10 @@ class RouteRepository(private val dao: RouteDao) {
     }
  
     /**
-     * 更新路线的所有步骤
+     * 更新路线的所有步骤 (使用 @Transaction 原子操作)
      */
     suspend fun updateRouteSteps(routeId: String, steps: List<RouteStepEntity>) {
-        // 删除旧步骤
-        dao.deleteAllSteps(routeId)
-        // 插入新步骤
-        if (steps.isNotEmpty()) {
-            dao.insertSteps(steps)
-        }
+        dao.replaceAllSteps(routeId, steps)
     }
 
     // ===== Conversion helpers =====

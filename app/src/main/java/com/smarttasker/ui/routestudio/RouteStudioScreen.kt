@@ -47,7 +47,8 @@ fun RouteStudioScreen(
     taskName: String,
     routeRepo: RouteRepository,
     coreBridgeManager: CoreBridgeManager? = null,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenRouteEditor: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val steps by routeRepo.getStepsForRoute(routeId).collectAsState(initial = emptyList())
@@ -193,8 +194,12 @@ fun RouteStudioScreen(
                         step = selectedStep!!,
                         screenshotManager = screenshotManager,
                         onEdit = {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("编辑功能即将上线")
+                            if (onOpenRouteEditor != null) {
+                                onOpenRouteEditor(routeId)
+                            } else {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("编辑功能即将上线")
+                                }
                             }
                         },
                         onSingleStepTest = {
@@ -315,7 +320,8 @@ private suspend fun executeStepAction(
     return try {
         when (step.type) {
             "tap" -> {
-                val coords = parseCoordinate(step.locatorValue)
+                // 支持多种定位策略
+                val coords = resolveTapCoordinates(step, sense)
                 if (coords != null) {
                     input.tap(coords.first, coords.second)
                     kotlinx.coroutines.delay(500)
@@ -323,16 +329,10 @@ private suspend fun executeStepAction(
                 } else false
             }
             "swipe" -> {
-                // Simple swipe using locator value as "startX,startY endX,endY"
-                val parts = step.locatorValue.split(",")
-                if (parts.size >= 4) {
-                    input.swipe(
-                        parts[0].trim().toIntOrNull() ?: 0,
-                        parts[1].trim().toIntOrNull() ?: 0,
-                        parts[2].trim().toIntOrNull() ?: 0,
-                        parts[3].trim().toIntOrNull() ?: 0,
-                        300
-                    )
+                // 解析滑动坐标: "startX,startY,endX,endY"
+                val coords = parseSwipeCoordinates(step)
+                if (coords != null) {
+                    input.swipe(coords[0], coords[1], coords[2], coords[3], 300)
                     kotlinx.coroutines.delay(500)
                     true
                 } else false
@@ -383,6 +383,96 @@ private suspend fun executeStepAction(
     } catch (e: Exception) {
         false
     }
+}
+
+/**
+ * 根据步骤的定位策略，解析出点击坐标。
+ * 支持: coordinate / text / resource_id / content_desc
+ */
+private suspend fun resolveTapCoordinates(
+    step: RouteStepEntity,
+    sense: SenseEngine
+): Pair<Int, Int>? {
+    return when (step.locatorStrategy) {
+        "coordinate" -> parseCoordinate(step.locatorValue)
+        "text", "resource_id", "content_desc" -> {
+            // 通过 uiautomator dump 找到元素坐标
+            val result = sense.dumpHierarchy()
+            when (result) {
+                is com.smarttasker.core.bridge.HierarchyResult.Success -> {
+                    findElementBounds(result.xml, step.locatorStrategy, step.locatorValue)
+                }
+                else -> null
+            }
+        }
+        else -> parseCoordinate(step.locatorValue)
+    }
+}
+
+/**
+ * 从 UI hierarchy XML 中查找匹配元素的中心坐标。
+ * @param xml uiautomator dump 的 XML
+ * @param strategy 定位策略: text / resource_id / content_desc
+ * @param value 要匹配的值
+ * @return 元素中心坐标 (x, y)，未找到返回 null
+ */
+private fun findElementBounds(xml: String, strategy: String, value: String): Pair<Int, Int>? {
+    try {
+        // uiautomator XML 格式: <node ... bounds="[x1,y1][x2,y2]" text="..." resource-id="..." content-desc="..." />
+        val attrName = when (strategy) {
+            "text" -> "text"
+            "resource_id" -> "resource-id"
+            "content_desc" -> "content-desc"
+            else -> return null
+        }
+
+        // 用正则匹配节点（避免 XML 解析器依赖）
+        val nodePattern = Regex("""<node\s[^>]*?>""")
+        val boundsPattern = Regex("""bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"""")
+        val attrPattern = Regex("""$attrName="([^"]*?)"""")
+
+        for (nodeMatch in nodePattern.findAll(xml)) {
+            val nodeStr = nodeMatch.value
+            val attrMatch = attrPattern.find(nodeStr) ?: continue
+            val attrValue = attrMatch.groupValues[1]
+
+            // 精确匹配或包含匹配
+            if (attrValue == value || attrValue.contains(value)) {
+                val boundsMatch = boundsPattern.find(nodeStr) ?: continue
+                val x1 = boundsMatch.groupValues[1].toInt()
+                val y1 = boundsMatch.groupValues[2].toInt()
+                val x2 = boundsMatch.groupValues[3].toInt()
+                val y2 = boundsMatch.groupValues[4].toInt()
+                return Pair((x1 + x2) / 2, (y1 + y2) / 2)
+            }
+        }
+    } catch (_: Exception) {}
+    return null
+}
+
+/**
+ * 解析滑动步骤的坐标。支持多种格式：
+ * - "startX,startY,endX,endY" (逗号分隔)
+ * - "startX startY endX endY" (空格分隔)
+ * - 从 step 的 fallbackValue 或 locatorValue 解析
+ */
+private fun parseSwipeCoordinates(step: RouteStepEntity): List<Int>? {
+    val value = step.locatorValue.ifEmpty { step.fallbackValue }
+    if (value.isBlank()) return null
+
+    // 尝试逗号分隔
+    val commaParts = value.split(",").map { it.trim().toIntOrNull() }
+    if (commaParts.size >= 4 && commaParts.all { it != null }) {
+        return commaParts.take(4).map { it!! }
+    }
+
+    // 尝试空格分隔
+    val spaceParts = value.split(Regex("\\s+")).map { it.trim().toIntOrNull() }
+    if (spaceParts.size >= 4 && spaceParts.all { it != null }) {
+        return spaceParts.take(4).map { it!! }
+    }
+
+    return null
 }
 
 private fun parseCoordinate(value: String): Pair<Int, Int>? {

@@ -12,6 +12,15 @@
 
 ---
 
+## [0.8.3] — 2026-05-28
+
+### Fixed
+- **路线编辑器"编辑"按钮失效** 🔴：RouteStudioScreen 的"编辑"按钮只显示 toast 不跳转，改为正确导航到 RouteEditorScreen
+- **路线步骤更新无事务保护** 🔴：`RouteRepository.updateRouteSteps()` 改用 `@Transaction` 的 `replaceAllSteps()`，防止崩溃丢数据
+- **executeStepAction 仅支持坐标定位** 🔴：新增 `resolveTapCoordinates()` 支持 text/resource_id/content_desc 策略，通过 `uiautomator dump` + XML 解析定位元素
+- **Swipe 步骤 locatorValue 为空** 🟡：新增 `parseSwipeCoordinates()` 支持逗号/空格分隔格式，兼容 fallbackValue
+- **RouteEditorScreen 修改不持久化** 🔴：addStep/deleteStep/toggleStep/moveStep/updateStep 全部改为自动写入 DB，返回 RouteStudio 时数据自动同步
+
 ## [0.4.0] — 2026-05-27
 
 ### Added
