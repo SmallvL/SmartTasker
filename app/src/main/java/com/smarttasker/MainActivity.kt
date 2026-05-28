@@ -10,6 +10,7 @@ import com.smarttasker.data.repository.TaskRepository
 import com.smarttasker.data.repository.RunRepository
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.data.repository.SettingsRepository
+import com.smarttasker.data.repository.TraceEventRepository
 import com.smarttasker.service.TaskExecutionService
 import com.smarttasker.ui.navigation.MainNavigation
 import com.smarttasker.ui.theme.SmartTaskerTheme
@@ -24,6 +25,7 @@ class MainActivity : ComponentActivity() {
         val runRepo = RunRepository(db.runRecordDao())
         val routeRepo = RouteRepository(db.routeDao())
         val settingsRepo = SettingsRepository(applicationContext)
+        val traceEventRepo = TraceEventRepository(db.traceDao())
         
         // Initialize CoreBridge
         val coreBridgeManager = CoreBridgeManager.getInstance(applicationContext)
@@ -43,6 +45,7 @@ class MainActivity : ComponentActivity() {
                     runRepo = runRepo,
                     routeRepo = routeRepo,
                     settingsRepo = settingsRepo,
+                    traceEventRepo = traceEventRepo,
                     coreBridgeManager = coreBridgeManager,
                     executionService = executionService
                 )

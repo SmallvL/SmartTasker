@@ -25,10 +25,12 @@ import androidx.navigation.navArgument
 import com.smarttasker.core.bridge.CoreBridgeManager
 import com.smarttasker.core.bridge.CoreStatus
 import com.smarttasker.data.entity.TaskEntity
+import com.smarttasker.data.entity.RunRecordEntity
 import com.smarttasker.data.repository.TaskRepository
 import com.smarttasker.data.repository.RunRepository
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.data.repository.SettingsRepository
+import com.smarttasker.data.repository.TraceEventRepository
 import com.smarttasker.service.TaskExecutionService
 import com.smarttasker.ui.home.HomeScreen
 import com.smarttasker.ui.tasks.TaskDetailScreen
@@ -86,6 +88,7 @@ fun MainNavigation(
     runRepo: RunRepository,
     routeRepo: RouteRepository,
     settingsRepo: SettingsRepository,
+    traceEventRepo: TraceEventRepository,
     coreBridgeManager: CoreBridgeManager,
     executionService: TaskExecutionService
 ) {
@@ -232,7 +235,14 @@ fun MainNavigation(
 
             // ===== Runs =====
             composable(Screen.Runs.route) {
-                RunListScreen(runRepo = runRepo)
+                RunListScreen(
+                    runRepo = runRepo,
+                    onRunClick = { run ->
+                        if (run.status == "failed") {
+                            navController.navigate("trace_explainer/${run.runId}")
+                        }
+                    }
+                )
             }
              // ===== Stats =====
              composable(Screen.Stats.route) {
@@ -502,6 +512,31 @@ fun MainNavigation(
                     settingsRepo = settingsRepo,
                     onBack = { navController.popBackStack() }
                 )
+            }
+
+            // ===== Trace Explainer =====
+            composable(
+                "trace_explainer/{runId}",
+                arguments = listOf(navArgument("runId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val runId = backStackEntry.arguments?.getString("runId") ?: return@composable
+                var runData by remember { mutableStateOf<RunRecordEntity?>(null) }
+                
+                LaunchedEffect(runId) {
+                    runData = runRepo.getRunById(runId)
+                }
+                
+                if (runData != null) {
+                    val traceEvents by traceEventRepo.getEventsForRun(runId).collectAsState(initial = emptyList())
+                    TraceExplainerScreen(
+                        run = runData!!,
+                        traceEvents = traceEvents,
+                        onOpenRouteStudio = {
+                            navController.navigate("route_studio/${runData!!.taskId}")
+                        },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
 
             // ===== Cost Budget =====

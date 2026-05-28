@@ -2,6 +2,7 @@ package com.smarttasker.ui.trace
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -14,17 +15,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.data.entity.RunRecordEntity
+import com.smarttasker.data.entity.TraceEventEntity
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TraceExplainerScreen(
     run: RunRecordEntity,
+    traceEvents: List<TraceEventEntity>,
     onOpenRouteStudio: () -> Unit,
     onBack: () -> Unit
 ) {
     var showTechLog by remember { mutableStateOf(false) }
+    val dateFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+
+    // Group trace events by step
+    val stepEvents = traceEvents.filter { it.stepId.isNotEmpty() }.groupBy { it.stepId }
+    val failedStep = traceEvents.find { it.stepResult == "failed" }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -66,6 +76,11 @@ fun TraceExplainerScreen(
                                     color = SmartColors.textSecondary()
                                 )
                             }
+                            Text(
+                                "耗时 ${run.durationMs}ms · ${dateFormat.format(Date(run.startedAt))}",
+                                fontSize = 13.sp,
+                                color = SmartColors.textTertiary()
+                            )
                         }
                     }
                 }
@@ -89,6 +104,31 @@ fun TraceExplainerScreen(
                         fontSize = 15.sp,
                         lineHeight = 24.sp
                     )
+
+                    // Show failed step details if available
+                    if (failedStep != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = SmartColors.danger().copy(alpha = 0.1f)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    "失败步骤详情",
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp,
+                                    color = SmartColors.danger()
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text("步骤 ID: ${failedStep.stepId}", fontSize = 13.sp)
+                                Text("操作类型: ${failedStep.stepType}", fontSize = 13.sp)
+                                Text("目标: ${failedStep.stepTarget}", fontSize = 13.sp)
+                                if (failedStep.message.isNotEmpty()) {
+                                    Text("错误信息: ${failedStep.message}", fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -120,6 +160,88 @@ fun TraceExplainerScreen(
                                 color = SmartColors.textSecondary(),
                                 lineHeight = 22.sp
                             )
+                        }
+                    }
+                }
+            }
+
+            // Execution timeline
+            if (stepEvents.isNotEmpty()) {
+                item {
+                    Text(
+                        "执行时间线",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
+                items(stepEvents.entries.toList()) { (stepId, events) ->
+                    val stepStart = events.find { it.eventType == "step_start" }
+                    val stepEnd = events.find { it.eventType == "step_end" }
+                    val isFailed = events.any { it.stepResult == "failed" }
+                    val isSuccess = events.any { it.stepResult == "success" }
+
+                    SmartCard {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Status indicator
+                            Icon(
+                                when {
+                                    isFailed -> Icons.Outlined.Error
+                                    isSuccess -> Icons.Outlined.CheckCircle
+                                    else -> Icons.Outlined.Schedule
+                                },
+                                contentDescription = null,
+                                tint = when {
+                                    isFailed -> SmartColors.danger()
+                                    isSuccess -> SmartColors.success()
+                                    else -> SmartColors.textTertiary()
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "步骤 $stepId",
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                )
+                                if (stepStart != null) {
+                                    Text(
+                                        "类型: ${stepStart.stepType} · 目标: ${stepStart.stepTarget}",
+                                        fontSize = 12.sp,
+                                        color = SmartColors.textSecondary()
+                                    )
+                                }
+                            }
+
+                            // Duration
+                            if (stepStart != null && stepEnd != null) {
+                                Text(
+                                    "${stepEnd.durationMs}ms",
+                                    fontSize = 12.sp,
+                                    color = SmartColors.textTertiary()
+                                )
+                            }
+                        }
+
+                        // Show error details for failed step
+                        if (isFailed) {
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = SmartColors.danger().copy(alpha = 0.1f)
+                            ) {
+                                Text(
+                                    events.filter { it.level == "error" }.joinToString("\n") { it.message },
+                                    fontSize = 12.sp,
+                                    color = SmartColors.danger(),
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -162,25 +284,23 @@ fun TraceExplainerScreen(
                             color = Color(0xFF1A1A1A)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                val logLines = listOf(
-                                    "[${run.startedAt}] RUN_START task=${run.taskId}",
-                                    "[${run.startedAt + 100}] STEP_START step=1 type=open_app",
-                                    "[${run.startedAt + 500}] STEP_OK step=1",
-                                    "[${run.startedAt + 600}] STEP_START step=2 type=wait",
-                                    "[${run.startedAt + 1600}] STEP_OK step=2",
-                                    "[${run.startedAt + 1700}] STEP_START step=3 type=tap locator=text",
-                                    "[${run.startedAt + 3200}] LOCATOR_MISS strategy=text value=\"目标\"",
-                                    "[${run.startedAt + 3300}] STEP_FAIL step=3 reason=locator_not_found",
-                                    "[${run.startedAt + 3400}] RUN_END status=failed"
-                                )
-                                logLines.forEach { line ->
+                                if (traceEvents.isEmpty()) {
                                     Text(
-                                        line,
-                                        fontSize = 11.sp,
+                                        "暂无详细日志",
+                                        fontSize = 12.sp,
                                         color = Color(0xFF10A37F),
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                        lineHeight = 18.sp
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                                     )
+                                } else {
+                                    traceEvents.forEach { event ->
+                                        Text(
+                                            "[${dateFormat.format(Date(event.timestamp))}] ${event.eventType} ${event.message}",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF10A37F),
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            lineHeight = 18.sp
+                                        )
+                                    }
                                 }
                             }
                         }

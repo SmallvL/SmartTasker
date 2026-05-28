@@ -11,6 +11,7 @@ class RunRepository(private val dao: RunRecordDao) {
     fun getRunsForTask(taskId: String): Flow<List<RunRecordEntity>> = dao.getRunsForTask(taskId)
     fun getRunsByStatus(status: String): Flow<List<RunRecordEntity>> = dao.getRunsByStatus(status)
     fun getRecentFailedRuns(limit: Int = 5): Flow<List<RunRecordEntity>> = dao.getRecentFailedRuns(limit)
+    suspend fun getRunById(runId: String): RunRecordEntity? = dao.getRunById(runId)
 
     private fun todayStart(): Long {
         val cal = Calendar.getInstance()

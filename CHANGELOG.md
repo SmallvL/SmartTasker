@@ -12,6 +12,20 @@
 
 ---
 
+## [0.9.0] — 2026-05-28
+
+### Added
+- **Trace Explainer 增强** — 失败诊断页面现在显示完整的执行时间线，包括每个步骤的执行状态、耗时和错误详情
+- **TraceEventRepository** — 新增 trace 事件数据仓库，支持按运行 ID 查询事件
+- **执行时间线** — 可视化展示每个步骤的执行过程，失败步骤高亮显示
+- **失败步骤详情** — 显示失败步骤的操作类型、目标元素和错误信息
+- **真实技术日志** — 技术日志现在显示真实的 trace 事件，而非硬编码示例数据
+
+### Changed
+- TraceExplainerScreen 重构：接收 traceEvents 参数，展示步骤级别执行详情
+- Navigation 新增 trace_explainer/{runId} 路由，支持从运行记录跳转到失败诊断
+- RunRepository 新增 getRunById() 方法
+
 ## [0.8.4] — 2026-05-28
 
 ### Fixed
