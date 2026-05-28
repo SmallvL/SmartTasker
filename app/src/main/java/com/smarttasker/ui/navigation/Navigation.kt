@@ -470,6 +470,7 @@ fun MainNavigation(
                     routeId = routeId,
                     taskName = taskName,
                     routeRepo = routeRepo,
+                    runRepo = runRepo,
                     coreBridgeManager = coreBridgeManager,
                     onBack = { navController.popBackStack() },
                     onOpenRouteEditor = { rid -> navController.navigate("route_editor/$rid") }

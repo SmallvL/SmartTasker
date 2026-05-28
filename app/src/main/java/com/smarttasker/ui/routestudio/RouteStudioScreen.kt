@@ -32,7 +32,9 @@ import com.smarttasker.core.direct.InputEngine
 import com.smarttasker.core.direct.SenseEngine
 import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.data.entity.RouteVersionEntity
+import com.smarttasker.data.entity.RunRecordEntity
 import com.smarttasker.data.repository.RouteRepository
+import com.smarttasker.data.repository.RunRepository
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +48,7 @@ fun RouteStudioScreen(
     routeId: String,
     taskName: String,
     routeRepo: RouteRepository,
+    runRepo: RunRepository? = null,
     coreBridgeManager: CoreBridgeManager? = null,
     onBack: () -> Unit,
     onOpenRouteEditor: ((String) -> Unit)? = null
@@ -96,10 +99,29 @@ fun RouteStudioScreen(
                             coroutineScope.launch {
                                 isTestingRoute = true
                                 testResult = null
+                                val startTime = System.currentTimeMillis()
                                 val result = executeRoute(steps, context)
+                                val durationMs = System.currentTimeMillis() - startTime
                                 testResult = result
                                 isTestingRoute = false
-                                if (result.startsWith("✅")) {
+                                
+                                // Save run record
+                                val runId = "run_${System.currentTimeMillis()}"
+                                val isSuccess = result.startsWith("✅")
+                                val runRecord = RunRecordEntity(
+                                    runId = runId,
+                                    taskId = routeId,
+                                    status = if (isSuccess) "success" else "failed",
+                                    durationMs = durationMs,
+                                    modelCalls = 0,
+                                    diagnosisSummary = if (isSuccess) "路线测试成功" else "路线测试失败",
+                                    diagnosisSuggestion = if (isSuccess) "路线执行完成" else result.take(100),
+                                    routeSnapshot = "",
+                                    retryCount = 0
+                                )
+                                runRepo?.insertRun(runRecord)
+                                
+                                if (isSuccess) {
                                     snackbarHostState.showSnackbar("路线执行成功")
                                 } else {
                                     snackbarHostState.showSnackbar("执行失败: ${result.take(50)}")
