@@ -174,7 +174,18 @@ fun CreateTaskScreen(
                             focusedBorderColor = SmartColors.accent(),
                             unfocusedBorderColor = SmartColors.borderSubtle()
                         ),
-                        maxLines = 3
+                        maxLines = 3,
+                        trailingIcon = {
+                            if (userInput.isNotEmpty()) {
+                                IconButton(onClick = { userInput = "" }) {
+                                    Icon(
+                                        Icons.Outlined.Clear,
+                                        contentDescription = "清除",
+                                        tint = SmartColors.textTertiary()
+                                    )
+                                }
+                            }
+                        }
                     )
                     FilledIconButton(
                         onClick = {

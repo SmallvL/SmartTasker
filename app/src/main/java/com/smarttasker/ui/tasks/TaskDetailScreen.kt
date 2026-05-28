@@ -38,11 +38,84 @@ fun TaskDetailScreen(
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    // Edit dialog state
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf("") }
+    var editDescription by remember { mutableStateOf("") }
+    var editTargetApp by remember { mutableStateOf("") }
+    var editTriggerType by remember { mutableStateOf("manual") }
+
     LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
 
     val taskData = task ?: run {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
+    }
+
+    // Edit dialog
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("编辑任务", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("任务名称") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editDescription,
+                        onValueChange = { editDescription = it },
+                        label = { Text("描述") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                    OutlinedTextField(
+                        value = editTargetApp,
+                        onValueChange = { editTargetApp = it },
+                        label = { Text("目标应用") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    // Trigger type selector
+                    Text("触发方式", fontSize = 14.sp, color = SmartColors.textSecondary())
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("manual" to "手动", "schedule" to "定时", "notification" to "通知").forEach { (type, label) ->
+                            FilterChip(
+                                selected = editTriggerType == type,
+                                onClick = { editTriggerType = type },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    coroutineScope.launch {
+                        val updated = taskData.copy(
+                            name = editName,
+                            description = editDescription,
+                            targetAppName = editTargetApp,
+                            triggerType = editTriggerType
+                        )
+                        taskRepo.updateTask(updated)
+                        task = updated
+                        showEditDialog = false
+                    }
+                }) {
+                    Text("保存")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -51,8 +124,16 @@ fun TaskDetailScreen(
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回") } },
             actions = {
                 IconButton(onClick = {
+                    editName = taskData.name
+                    editDescription = taskData.description
+                    editTargetApp = taskData.targetAppName
+                    editTriggerType = taskData.triggerType
+                    showEditDialog = true
+                }) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "编辑")
+                }
+                IconButton(onClick = {
                     coroutineScope.launch {
-                        // Cancel any pending alarm before deleting
                         AlarmScheduler.cancelAlarm(context, taskData.taskId)
                         taskRepo.deleteTask(taskData)
                         onBack()
@@ -101,13 +182,11 @@ fun TaskDetailScreen(
                                 val wasActive = taskData.status == "active"
                                 if (wasActive) {
                                     taskRepo.pauseTask(taskData)
-                                    // Cancel alarm when pausing
                                     if (taskData.triggerType == "schedule") {
                                         AlarmScheduler.cancelAlarm(context, taskData.taskId)
                                     }
                                 } else {
                                     taskRepo.activateTask(taskData)
-                                    // Schedule alarm when activating a scheduled task
                                     if (taskData.triggerType == "schedule") {
                                         val publishedRoute = routeRepo.getLatestPublishedRoute(taskData.taskId)
                                         AlarmScheduler.scheduleAlarm(context, taskData, publishedRoute?.routeId ?: "")
@@ -120,6 +199,19 @@ fun TaskDetailScreen(
                     ) {
                         Icon(if (taskData.status == "active") Icons.Outlined.Pause else Icons.Outlined.PlayArrow, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp)); Text(if (taskData.status == "active") "暂停" else "启用")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            editName = taskData.name
+                            editDescription = taskData.description
+                            editTargetApp = taskData.targetAppName
+                            editTriggerType = taskData.triggerType
+                            showEditDialog = true
+                        },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(16)
+                    ) {
+                        Icon(Icons.Outlined.Edit, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp)); Text("编辑")
                     }
                 }
             }
