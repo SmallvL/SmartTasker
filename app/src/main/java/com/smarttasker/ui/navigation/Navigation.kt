@@ -43,6 +43,8 @@ import com.smarttasker.ui.trialrun.RouteLearningResultScreen
 import com.smarttasker.ui.routestudio.RouteStudioScreen
 import com.smarttasker.ui.routeeditor.RouteEditorViewModel
 import com.smarttasker.ui.routeeditor.RouteEditorScreen
+import com.smarttasker.ui.stats.StatsViewModel
+import com.smarttasker.ui.stats.StatsScreen
 import com.smarttasker.ui.trace.TraceExplainerScreen
 import com.smarttasker.ui.permission.PermissionDoctorScreen
 import com.smarttasker.ui.safety.SafetyGuard
@@ -72,9 +74,10 @@ sealed class Screen(
     object Tasks : Screen("tasks", "任务", Icons.Outlined.CheckCircle, Icons.Filled.CheckCircle)
     object Runs : Screen("runs", "记录", Icons.Outlined.History, Icons.Filled.History)
     object Settings : Screen("settings", "设置", Icons.Outlined.Settings, Icons.Filled.Settings)
+    object Stats : Screen("stats", "统计", Icons.Outlined.BarChart, Icons.Filled.BarChart)
 }
 
-val bottomNavItems = listOf(Screen.Home, Screen.Tasks, Screen.Runs, Screen.Settings)
+val bottomNavItems = listOf(Screen.Home, Screen.Tasks, Screen.Runs, Screen.Stats, Screen.Settings)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -231,9 +234,24 @@ fun MainNavigation(
             composable(Screen.Runs.route) {
                 RunListScreen(runRepo = runRepo)
             }
+             // ===== Stats =====
+             composable(Screen.Stats.route) {
+                 val statsCtx = androidx.compose.ui.platform.LocalContext.current
+                 val statsViewModel = remember {
+                     StatsViewModel(
+                         application = statsCtx.applicationContext as android.app.Application,
+                         runRepo = runRepo,
+                         taskRepo = taskRepo
+                     )
+                 }
+                 StatsScreen(
+                     viewModel = statsViewModel,
+                     onBack = { navController.popBackStack() }
+                 )
+             }
 
-            // ===== Settings =====
-            composable("settings") {
+             // ===== Settings =====
+             composable("settings") {
                 SettingsScreen(
                     onNavigateToPermissions = { navController.navigate("permissions") },
                     onNavigateToSafetyPolicy = { navController.navigate("safety_policy") },
