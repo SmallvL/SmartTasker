@@ -5,13 +5,17 @@ import com.smarttasker.core.bridge.*
 import com.smarttasker.core.parser.TaskSpec
 import com.smarttasker.core.adapter.RouteAdapter
 import com.smarttasker.core.adapter.TraceAdapter
+import com.smarttasker.core.retry.RetryExecutor
+import com.smarttasker.core.retry.RetryPolicy
+import com.smarttasker.core.screenshot.ScreenshotManager
 import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.data.entity.RunRecordEntity
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.data.repository.RunRepository
+import com.smarttasker.util.DebugLog
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-
+ 
 /**
  * Service that orchestrates task execution through CoreBridge.
  * Handles: submit → monitor → collect route/trace → save.
@@ -19,11 +23,15 @@ import kotlinx.coroutines.flow.*
 class TaskExecutionService(
     private val context: Context,
     private val routeRepository: RouteRepository,
-    private val runRepository: RunRepository
+    private val runRepository: RunRepository,
+    private val screenshotManager: ScreenshotManager? = null
 ) {
     private val manager = CoreBridgeManager.getInstance(context)
     private val bridge: CoreBridge get() = manager.bridge
-    
+
+    private val submitRetryExecutor = RetryExecutor(RetryPolicy.DEFAULT)
+    private val pollRetryExecutor = RetryExecutor(RetryPolicy.FAST)
+
     // ===== Execution State =====
     
     private val _executionState = MutableStateFlow<ExecutionState>(ExecutionState.Idle)
@@ -37,6 +45,7 @@ class TaskExecutionService(
      */
     suspend fun executeQuickTask(taskSpec: TaskSpec): ExecutionResult {
         var result: ExecutionResult
+        var totalRetryCount = 0
         try {
             // Build payload FIRST (before any state changes that trigger recomposition)
             val payload = try {
@@ -49,34 +58,62 @@ class TaskExecutionService(
             // NOW set submitting state (triggers recomposition)
             _executionState.value = ExecutionState.Submitting
 
-            val submitResult = try {
-                bridge.submitQuickTask(payload)
-            } catch (e: Exception) {
-                _executionState.value = ExecutionState.Error("提交失败: ${e.message}")
-                return ExecutionResult.Error("提交失败: ${e.message}")
+            // 提交任务（带重试）
+            DebugLog.i("TaskExec", "提交任务，启用重试机制")
+            val submitRetryResult = submitRetryExecutor.executeCatching(
+                operation = {
+                    val submitResult = bridge.submitQuickTask(payload)
+                    when (submitResult) {
+                        is TaskSubmitResult.Accepted -> Pair(submitResult.taskId, submitResult.runId)
+                        is TaskSubmitResult.Error -> throw RuntimeException(submitResult.message)
+                    }
+                },
+                onRetry = { retryCount, exception, delayMs ->
+                    totalRetryCount += 1
+                    DebugLog.w("TaskExec", "提交重试 #$retryCount: ${exception.message}, ${delayMs}ms后重试")
+                }
+            )
+
+            if (submitRetryResult.isFailure) {
+                val error = submitRetryResult.exceptionOrNull()
+                DebugLog.e("TaskExec", "提交失败(已重试${totalRetryCount}次): ${error?.message}")
+                _executionState.value = ExecutionState.Error("提交失败: ${error?.message}")
+                return ExecutionResult.Error("提交失败: ${error?.message}")
             }
 
-            val (taskId, runId) = when (submitResult) {
-                is TaskSubmitResult.Accepted -> Pair(submitResult.taskId, submitResult.runId)
-                is TaskSubmitResult.Error -> {
-                    _executionState.value = ExecutionState.Error(submitResult.message)
-                    return ExecutionResult.Error(submitResult.message)
-                }
-            }
+            val (taskId, runId) = submitRetryResult.getOrThrow()
+            DebugLog.i("TaskExec", "任务提交成功 taskId=$taskId, 提交重试次数=$totalRetryCount")
 
             _executionState.value = ExecutionState.Running(taskId = taskId, phase = "执行中", progress = 0f)
-            
-            val finalStatus = pollUntilDone(taskId)
-            
+
+            val (finalStatus, pollRetryCount) = pollUntilDone(taskId)
+            totalRetryCount += pollRetryCount
+
             result = when (finalStatus.state) {
                 "success" -> {
                     _executionState.value = ExecutionState.Completed(taskId)
-                    
+ 
+                    // 任务成功后截图验证
+                    val screenshotPath = screenshotManager?.let { manager ->
+                        when (val result = manager.captureScreen("task_${taskId}")) {
+                            is com.smarttasker.core.screenshot.ScreenshotManager.ScreenshotResult.Success -> {
+                                DebugLog.i("TaskExec", "任务截图成功: ${result.path}")
+                                result.path
+                            }
+                            is com.smarttasker.core.screenshot.ScreenshotManager.ScreenshotResult.Error -> {
+                                DebugLog.w("TaskExec", "任务截图失败: ${result.message}")
+                                null
+                            }
+                            else -> null
+                            }
+                    }
+ 
                     val route = collectRoute(taskId)
                     val trace = collectTrace(taskId)
                     val parsedRoute = route?.let { RouteAdapter.parseRoute(it, taskId) }
                     val steps = parsedRoute?.steps ?: emptyList()
-                    
+
+                    DebugLog.i("TaskExec", "任务成功完成, 总重试次数=$totalRetryCount")
                     val runRecord = RunRecordEntity(
                         runId = runId,
                         taskId = taskId,
@@ -84,10 +121,12 @@ class TaskExecutionService(
                         diagnosisSummary = "试跑成功",
                         diagnosisSuggestion = "路线已学习，可复用",
                         modelCalls = 0,
-                        routeSnapshot = route ?: ""
-                    )
+                        routeSnapshot = route ?: "",
+                        retryCount = totalRetryCount,
+                        screenshotPath = screenshotPath
+                        )
                     runRepository.insertRun(runRecord)
-                    
+
                     ExecutionResult.Success(
                         taskId = taskId,
                         routeJson = route,
@@ -97,11 +136,12 @@ class TaskExecutionService(
                 }
                 "failed" -> {
                     _executionState.value = ExecutionState.Error(finalStatus.detail)
-                    
+
                     val trace = collectTrace(taskId)
                     val parsedTrace = TraceAdapter.parseTrace(trace ?: emptyList(), taskId, runId)
                     val diagnosis = Pair(parsedTrace.runRecord.diagnosisSummary, parsedTrace.runRecord.diagnosisSuggestion)
-                    
+
+                    DebugLog.w("TaskExec", "任务失败, 总重试次数=$totalRetryCount, 原因=${finalStatus.detail}")
                     val runRecord = RunRecordEntity(
                         runId = runId,
                         taskId = taskId,
@@ -109,10 +149,11 @@ class TaskExecutionService(
                         diagnosisSummary = diagnosis.first,
                         diagnosisSuggestion = diagnosis.second,
                         modelCalls = 0,
-                        routeSnapshot = ""
+                        routeSnapshot = "",
+                        retryCount = totalRetryCount
                     )
                     runRepository.insertRun(runRecord)
-                    
+
                     ExecutionResult.Failed(
                         taskId = taskId,
                         reason = finalStatus.detail,
@@ -186,10 +227,29 @@ class TaskExecutionService(
     
     // ===== Private Helpers =====
     
-    private suspend fun pollUntilDone(taskId: String): TaskStatusResult.Status {
-        return withTimeoutOrNull(120_000L) { // 2 min timeout
+    private suspend fun pollUntilDone(taskId: String): Pair<TaskStatusResult.Status, Int> {
+        var pollRetryCount = 0
+        val status = withTimeoutOrNull(120_000L) { // 2 min timeout
             while (true) {
-                when (val result = bridge.getTaskStatus(taskId)) {
+                val retryResult = pollRetryExecutor.executeCatching(
+                    operation = { bridge.getTaskStatus(taskId) },
+                    onRetry = { retryCount, exception, delayMs ->
+                        pollRetryCount += 1
+                        DebugLog.w("TaskExec", "轮询重试 #$retryCount: ${exception.message}, ${delayMs}ms后重试")
+                    }
+                )
+
+                if (retryResult.isFailure) {
+                    DebugLog.e("TaskExec", "轮询状态失败(已重试${pollRetryCount}次): ${retryResult.exceptionOrNull()?.message}")
+                    return@withTimeoutOrNull TaskStatusResult.Status(
+                        taskId = taskId,
+                        state = "failed",
+                        phase = "error",
+                        detail = "轮询失败: ${retryResult.exceptionOrNull()?.message}"
+                    )
+                }
+
+                when (val result = retryResult.getOrThrow()) {
                     is TaskStatusResult.Status -> {
                         _executionState.value = ExecutionState.Running(
                             taskId = taskId,
@@ -214,6 +274,11 @@ class TaskExecutionService(
             @Suppress("UNREACHABLE_CODE")
             TaskStatusResult.Status(taskId, "failed", "timeout", "执行超时")
         } ?: TaskStatusResult.Status(taskId, "failed", "timeout", "执行超时 (2分钟)")
+
+        if (pollRetryCount > 0) {
+            DebugLog.i("TaskExec", "轮询完成, 轮询重试次数=$pollRetryCount")
+        }
+        return Pair(status, pollRetryCount)
     }
     
     private suspend fun collectRoute(taskId: String): String? {

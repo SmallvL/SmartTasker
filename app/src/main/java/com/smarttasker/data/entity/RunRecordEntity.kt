@@ -18,5 +18,7 @@ data class RunRecordEntity(
     val failureType: String? = null,             // locator_not_found / timeout / model_error / safety_blocked / etc
     val diagnosisSummary: String = "",
     val diagnosisSuggestion: String = "",
-    val routeSnapshot: String = ""               // AutoLXB route JSON snapshot
-)
+    val routeSnapshot: String = "",              // AutoLXB route JSON snapshot
+    val retryCount: Int = 0,                    // 重试次数
+    val screenshotPath: String? = null           // 截图路径
+    )
