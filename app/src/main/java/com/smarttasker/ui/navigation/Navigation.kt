@@ -41,6 +41,8 @@ import com.smarttasker.ui.trialrun.TrialModeSelectScreen
 import com.smarttasker.ui.trialrun.ManualRecordingScreen
 import com.smarttasker.ui.trialrun.RouteLearningResultScreen
 import com.smarttasker.ui.routestudio.RouteStudioScreen
+import com.smarttasker.ui.routeeditor.RouteEditorViewModel
+import com.smarttasker.ui.routeeditor.RouteEditorScreen
 import com.smarttasker.ui.trace.TraceExplainerScreen
 import com.smarttasker.ui.permission.PermissionDoctorScreen
 import com.smarttasker.ui.safety.SafetyGuard
@@ -443,9 +445,31 @@ fun MainNavigation(
                     coreBridgeManager = coreBridgeManager,
                     onBack = { navController.popBackStack() }
                 )
-            }
+                }
 
-            // ===== Permission Doctor =====
+                // ===== Route Editor =====
+                composable(
+                 "route_editor/{routeId}",
+                 arguments = listOf(
+                     navArgument("routeId") { type = NavType.StringType }
+                 )
+                ) { backStackEntry ->
+                    val routeId = backStackEntry.arguments?.getString("routeId") ?: ""
+                    val editorCtx = androidx.compose.ui.platform.LocalContext.current
+                    val routeEditorViewModel = remember {
+                        RouteEditorViewModel(
+                            application = editorCtx.applicationContext as android.app.Application,
+                            routeRepo = routeRepo,
+                            routeId = routeId
+                        )
+                    }
+                 RouteEditorScreen(
+                     viewModel = routeEditorViewModel,
+                     onNavigateBack = { navController.popBackStack() }
+                 )
+                }
+
+                // ===== Permission Doctor =====
             composable("permissions") {
                 PermissionDoctorScreen(
                     coreBridgeManager = coreBridgeManager,

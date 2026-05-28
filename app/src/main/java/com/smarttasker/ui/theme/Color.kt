@@ -1,6 +1,22 @@
 package com.smarttasker.ui.theme
 
 import androidx.compose.ui.graphics.Color
+ 
+ // ===== Linear Design System Colors =====
+ val LinearBgMarketing = Color(0xFF08090a)
+ val LinearBgPanel = Color(0xFF0f1011)
+ val LinearBgSurface = Color(0xFF191a1b)
+ val LinearTextPrimary = Color(0xFFf7f8f8)
+ val LinearTextSecondary = Color(0xFFd0d6e0)
+ val LinearTextTertiary = Color(0xFF8a8f98)
+ val LinearTextQuaternary = Color(0xFF5a5f68)
+ val LinearBrandIndigo = Color(0xFF5e6ad2)
+ val LinearAccentViolet = Color(0xFF7170ff)
+ val LinearGreen = Color(0xFF27a644)
+ val LinearEmerald = Color(0xFF10b981)
+ val LinearRed = Color(0xFFef4444)
+ val LinearYellow = Color(0xFFeab308)
+ val LinearBlue = Color(0xFF3b82f6)
 
 // Light theme tokens
 object LightColors {
