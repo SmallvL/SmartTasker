@@ -28,6 +28,18 @@ class AdbShellExecutor(private val context: Context) {
      * If port is 0, uses autoConnect exclusively (for when the connect endpoint was not found during pairing).
      */
     suspend fun connect(host: String, port: Int): Boolean = withContext(Dispatchers.IO) {
+        // Quick check: already connected to same endpoint?
+        if (connected && manager != null && lastHost == host && lastPort == port) {
+            try {
+                // Verify connection is still alive with a quick command
+                val testResult = exec("echo ok")
+                if (testResult is com.smarttasker.core.direct.ShellResult.Success) {
+                    DebugLog.i("AdbShell", "Already connected to $host:$port, skipping reconnect")
+                    return@withContext true
+                }
+            } catch (_: Exception) {}
+            // Connection stale, reconnect
+        }
         DebugLog.i("AdbShell", "Connecting to $host:$port via TLS (port==0 means auto-connect only)...")
         try {
             disconnect()

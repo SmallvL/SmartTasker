@@ -86,6 +86,11 @@ object ShellExecutor {
      */
     suspend fun connectAdb(host: String, port: Int): Boolean {
         val executor = adbExecutor ?: return false
+        // Quick check: already connected?
+        if (executor.isConnected() && cachedMode == ShellMode.ADB) {
+            DebugLog.i("ShellExec", "Already in ADB mode, skipping reconnect")
+            return true
+        }
         val result = executor.connect(host, port)
         if (result) {
             cachedMode = ShellMode.ADB

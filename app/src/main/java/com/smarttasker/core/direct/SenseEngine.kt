@@ -27,10 +27,11 @@ class SenseEngine(private val context: Context) {
     suspend fun screenshot(): ScreenshotResult = withContext(Dispatchers.IO) {
         try {
             // screencap 需要一个 shell 用户可写的路径
-            // /data/local/tmp/ 对 shell、root、sh 均可写
+            // 优先 /data/local/tmp/，回退到 app cache dir
             val tmpDir = File("/data/local/tmp")
-            if (!tmpDir.exists()) tmpDir.mkdirs()
-            val tmpFile = File(tmpDir, "smarttasker_screenshot_tmp.png")
+            val canWriteTmp = try { tmpDir.exists() || tmpDir.mkdirs() } catch (_: Exception) { false }
+            val actualDir = if (canWriteTmp) tmpDir else context.cacheDir
+            val tmpFile = File(actualDir, "smarttasker_screenshot_tmp.png")
 
             // Take screenshot to shared tmp path
             val result = ShellExecutor.exec("screencap -p ${tmpFile.absolutePath}")

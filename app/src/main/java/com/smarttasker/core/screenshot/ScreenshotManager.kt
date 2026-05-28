@@ -54,10 +54,11 @@ class ScreenshotManager(private val context: Context) {
             }
 
             // screencap 需要一个 shell 用户可写的路径
-            // /data/local/tmp/ 对 shell、root、sh 均可写
+            // 优先 /data/local/tmp/，回退到 app cache dir
             val tmpDir = File("/data/local/tmp")
-            if (!tmpDir.exists()) tmpDir.mkdirs()
-            val tmpFile = File(tmpDir, "smarttasker_screencap_tmp.png")
+            val canWriteTmp = try { tmpDir.exists() || tmpDir.mkdirs() } catch (_: Exception) { false }
+            val actualDir = if (canWriteTmp) tmpDir else context.cacheDir
+            val tmpFile = File(actualDir, "smarttasker_screencap_tmp.png")
 
             // 使用 ADB screencap 命令截图到共享临时目录
             val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "screencap -p ${tmpFile.absolutePath}"))

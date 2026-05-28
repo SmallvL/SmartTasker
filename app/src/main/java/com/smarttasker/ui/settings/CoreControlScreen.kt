@@ -350,7 +350,7 @@ private suspend fun connectToSavedEndpoint(
     onResult: (Boolean, String) -> Unit
 ) {
     try {
-        kotlinx.coroutines.withTimeout(30_000L) {
+        kotlinx.coroutines.withTimeout(20_000L) {
             try {
                 val prefs = context.getSharedPreferences("smarttasker_config", Context.MODE_PRIVATE)
                 val host = prefs.getString("adb_host", "127.0.0.1") ?: "127.0.0.1"
@@ -359,19 +359,16 @@ private suspend fun connectToSavedEndpoint(
 
                 // Phase 1: Try direct port connection (skip if port==0)
                 if (port > 0) {
-                    for (attempt in 1..2) {
-                        try {
-                            val connected = ShellExecutor.connectAdb(host, port)
-                            DebugLog.i("CoreCtrl", "Direct attempt $attempt: $connected")
-                            if (connected) {
-                                coreBridgeManager.refreshStatus()
-                                onResult(true, "ADB 连接成功 ($host:$port)")
-                                return@withTimeout
-                            }
-                        } catch (e: Exception) {
-                            DebugLog.e("CoreCtrl", "Direct attempt $attempt failed: ${e.message}")
+                    try {
+                        val connected = ShellExecutor.connectAdb(host, port)
+                        DebugLog.i("CoreCtrl", "Direct attempt: $connected")
+                        if (connected) {
+                            coreBridgeManager.refreshStatus()
+                            onResult(true, "ADB 连接成功 ($host:$port)")
+                            return@withTimeout
                         }
-                        delay(1000)
+                    } catch (e: Exception) {
+                        DebugLog.e("CoreCtrl", "Direct attempt failed: ${e.message}")
                     }
                 }
 
@@ -391,8 +388,8 @@ private suspend fun connectToSavedEndpoint(
 
                 onResult(false, "连接失败: 请确认无线调试仍开启，且设备在同一网络")
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                DebugLog.e("CoreCtrl", "connectToSavedEndpoint timed out after 30s")
-                onResult(false, "连接超时: ADB 连接未能在 30 秒内完成")
+                DebugLog.e("CoreCtrl", "connectToSavedEndpoint timed out after 20s")
+                onResult(false, "连接超时: ADB 连接未能在 20 秒内完成")
             } catch (e: Exception) {
                 DebugLog.e("CoreCtrl", "connectToSavedEndpoint error: ${e.message}")
                 onResult(false, "连接异常: ${e.message}")
