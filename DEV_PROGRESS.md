@@ -1,86 +1,73 @@
 # SmartTasker 开发进度
 
-## 当前版本: v0.6.0
+## 当前版本: v0.7.0
 
 ---
 
 ## Phase 1: 核心稳定性增强 ✅ (v0.5.0)
 
-### 完成功能
 - **错误重试机制** (RetryPolicy + RetryExecutor)
-  - 3次重试，指数退避
-  - 可配置重试策略
-  
 - **屏幕截图验证** (ScreenshotManager)
-  - 任务成功后自动截图
-  - 截图路径记录到运行记录
-  
-- **日志增强** (TraceEventEntity)
-  - 步骤级别日志
-  - 截图路径字段
-  - 错误重试信息
-
-### 新增文件
-```
-core/retry/RetryPolicy.kt
-core/retry/RetryExecutor.kt
-core/screenshot/ScreenshotManager.kt
-```
+- **日志增强** (TraceEventEntity 扩展)
 
 ---
 
 ## Phase 2: 智能触发 ✅ (v0.6.0)
 
-### 完成功能
 - **通知触发** (NotificationTrigger)
-  - 监听通知栏消息
-  - 正则匹配触发规则
-  - 支持应用包名+关键词过滤
-  
 - **条件执行** (ConditionalExecutor)
-  - 条件检查器接口
-  - 屏幕状态检查
-  - 网络状态检查
-  - 电量状态检查
-  
 - **变量传递** (VariableEngine)
-  - 系统变量 (设备信息、时间、电量)
-  - 用户变量
-  - 任务变量
-  - 上下文变量
-  - 变量替换功能
+
+---
+
+## Phase 3: 路线编辑器 ✅ (v0.7.0)
+
+### 完成功能
+- **路线编辑器 ViewModel** (RouteEditorViewModel)
+  - 加载路线数据
+  - 步骤增删改查
+  - 步骤拖拽排序
+  - 路线保存
+
+- **路线步骤编辑 UI** (RouteEditorScreen)
+  - 步骤列表显示
+  - 步骤类型图标
+  - 步骤摘要
+  - 启用/禁用开关
+  - 上移/下移/删除操作
+
+- **步骤参数编辑** (StepEditDialog)
+  - 步骤类型选择器
+  - 定位策略选择器
+  - 等待时间、重试次数
+  - 执行前确认选项
+
+- **路线导入导出** (RouteImportExport)
+  - JSON 格式导出
+  - JSON 格式导入
+  - 文件选择器支持
+
+- **Linear 设计系统颜色** (Color.kt)
+  - 17 个颜色常量
 
 ### 新增文件
 ```
-core/trigger/NotificationTrigger.kt
-core/condition/ConditionalExecutor.kt
-core/variable/VariableEngine.kt
+ui/routeeditor/RouteEditorViewModel.kt
+ui/routeeditor/RouteEditorScreen.kt
+ui/routeeditor/StepEditDialog.kt
+util/RouteImportExport.kt
 ```
 
 ### 更新文件
 ```
-AndroidManifest.xml - 注册通知监听服务
+ui/navigation/Navigation.kt - 路线编辑器路由
+data/repository/RouteRepository.kt - updateRouteSteps
+ui/theme/Color.kt - Linear 设计系统颜色
 ```
 
 ---
 
-## Phase 3: 路线编辑器 (计划中)
-
-### 待开发功能
-- 路线步骤编辑
-- 步骤拖拽排序
-- 步骤参数编辑
-- 路线导入导出
-
----
-
 ## Phase 4: 数据统计 (计划中)
-
-### 待开发功能
-- 运行统计图表
-- 成功率分析
-- 性能监控
-- 导出报告
 
 ---
 
@@ -88,14 +75,9 @@ AndroidManifest.xml - 注册通知监听服务
 
 | 版本 | 日期 | 功能 |
 |------|------|------|
+| v0.7.0 | 2026-05-27 | Phase 3 - 路线编辑器 |
 | v0.6.0 | 2026-05-26 | Phase 2 - 智能触发系统 |
 | v0.5.0 | 2026-05-26 | Phase 1 - 核心稳定性增强 |
 | v0.4.0 | 2026-05-25 | Epic F - 定时执行、数据库导入 |
 | v0.3.0 | 2026-05-25 | ADB_LOCAL 流式录制 |
 | v0.2.0 | 2026-05-25 | SH模式状态区分 |
-| v0.1.5 | 2026-05-25 | SH模式能力徽章 |
-| v0.1.4 | 2026-05-25 | 7个核心BUG修复 |
-| v0.1.3 | 2026-05-25 | 路线持久化 |
-| v0.1.2 | 2026-05-25 | 定位编辑器修复 |
-| v0.1.1 | 2026-05-25 | Route Studio MVP |
-| v0.1.0 | 2026-05-25 | 路线学习 |
