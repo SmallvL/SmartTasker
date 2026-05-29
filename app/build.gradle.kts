@@ -14,8 +14,8 @@ android {
         applicationId = "com.smarttasker"
         minSdk = 24
         targetSdk = 34
-        versionCode = 16
-        versionName = "0.9.4"
+        versionCode = 18
+        versionName = "0.9.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

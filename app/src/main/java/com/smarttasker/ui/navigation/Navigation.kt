@@ -209,6 +209,17 @@ fun MainNavigation(
                     },
                     onNavigateToTrace = { runId ->
                         navController.navigate("trace_explainer/$runId")
+                    },
+                    onDeleteTask = { task ->
+                        scope.launch {
+                            taskRepo.deleteTask(task)
+                        }
+                    },
+                    onToggleTask = { task ->
+                        scope.launch {
+                            val newStatus = if (task.status == "active") "paused" else "active"
+                            taskRepo.updateTask(task.copy(status = newStatus, updatedAt = System.currentTimeMillis()))
+                        }
                     }
                 )
             }

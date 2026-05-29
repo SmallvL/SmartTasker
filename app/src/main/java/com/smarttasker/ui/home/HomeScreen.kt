@@ -1,14 +1,22 @@
 package com.smarttasker.ui.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +39,9 @@ fun HomeScreen(
     onTaskClick: (TaskEntity) -> Unit = {},
     onNavigateToTaskList: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToTrace: (String) -> Unit = {}
+    onNavigateToTrace: (String) -> Unit = {},
+    onDeleteTask: (TaskEntity) -> Unit = {},
+    onToggleTask: (TaskEntity) -> Unit = {}
 ) {
     val recentTasks by taskRepo.getRecentTasks(5).collectAsState(initial = emptyList())
     val activeCount by taskRepo.getActiveTaskCount().collectAsState(initial = 0)
@@ -229,8 +239,13 @@ fun HomeScreen(
                 EmptyState(icon = Icons.Outlined.CheckCircle, title = "还没有任务", subtitle = "在上方输入你想自动完成的事情")
             }
         } else {
-            items(recentTasks) { task ->
-                TaskMiniCard(task, onClick = { onTaskClick(task) })
+            items(recentTasks, key = { it.taskId }) { task ->
+                TaskMiniCard(
+                    task = task,
+                    onClick = { onTaskClick(task) },
+                    onDelete = { onDeleteTask(task) },
+                    onToggle = { onToggleTask(task) }
+                )
             }
         }
     }
@@ -272,26 +287,92 @@ private fun SummaryItem(label: String, value: String, color: Color) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TaskMiniCard(task: TaskEntity, onClick: () -> Unit) {
-    SmartCard(onClick = onClick) {
+private fun TaskMiniCard(
+    task: TaskEntity,
+    onClick: () -> Unit,
+    onDelete: () -> Unit = {},
+    onToggle: () -> Unit = {}
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    SmartCard(
+        onClick = onClick,
+        onLongClick = { showMenu = true }
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(task.name, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+            // App icon placeholder
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(SmartColors.accent().copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    when (task.triggerType) {
-                        "schedule" -> "定时 · ${task.triggerTime}"
-                        "notification" -> "通知触发"
-                        else -> "手动执行"
-                    },
-                    fontSize = 13.sp,
-                    color = SmartColors.textTertiary()
+                    text = task.targetAppName.ifEmpty { task.name.take(1) }.take(1),
+                    color = SmartColors.accent(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
                 )
             }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(task.name, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Trigger info
+                    Text(
+                        when (task.triggerType) {
+                            "schedule" -> "⏰ ${task.triggerTime}"
+                            "notification" -> "🔔 通知触发"
+                            else -> "▶️ 手动"
+                        },
+                        fontSize = 12.sp,
+                        color = SmartColors.textTertiary()
+                    )
+
+                    // Repeat info
+                    if (task.triggerType == "schedule") {
+                        Text(
+                            when (task.triggerRepeat) {
+                                "daily" -> "每天"
+                                "weekly" -> "每周"
+                                else -> "一次"
+                            },
+                            fontSize = 12.sp,
+                            color = SmartColors.textTertiary()
+                        )
+                    }
+
+                    // Risk level
+                    if (task.riskLevel != "low") {
+                        Text(
+                            when (task.riskLevel) {
+                                "high" -> "⚠️ 高风险"
+                                "critical" -> "🚫 禁止"
+                                else -> ""
+                            },
+                            fontSize = 12.sp,
+                            color = when (task.riskLevel) {
+                                "high" -> SmartColors.warning()
+                                "critical" -> SmartColors.danger()
+                                else -> SmartColors.textTertiary()
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Status pill
             StatusPill(
                 when (task.status) {
                     "active" -> "运行中"
@@ -303,6 +384,40 @@ private fun TaskMiniCard(task: TaskEntity, onClick: () -> Unit) {
                     "active" -> SmartColors.success()
                     "paused" -> SmartColors.warning()
                     else -> SmartColors.textTertiary()
+                }
+            )
+        }
+
+        // Context menu
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(if (task.status == "active") "暂停" else "启用") },
+                onClick = {
+                    showMenu = false
+                    onToggle()
+                },
+                leadingIcon = {
+                    Icon(
+                        if (task.status == "active") Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null
+                    )
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("删除", color = SmartColors.danger()) },
+                onClick = {
+                    showMenu = false
+                    onDelete()
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = SmartColors.danger()
+                    )
                 }
             )
         }

@@ -1,9 +1,11 @@
 package com.smarttasker.ui.common
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,17 +45,26 @@ fun StatusPill(
 }
 
 // Card container
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SmartCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(20)
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+            .then(
+                if (onClick != null || onLongClick != null) {
+                    Modifier.combinedClickable(
+                        onClick = { onClick?.invoke() },
+                        onLongClick = { onLongClick?.invoke() }
+                    )
+                } else Modifier
+            ),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
