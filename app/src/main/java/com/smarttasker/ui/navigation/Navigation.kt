@@ -218,7 +218,12 @@ fun MainNavigation(
                     },
                     onToggleTask = { task ->
                         scope.launch {
-                            val newStatus = if (task.status == "active") "paused" else "active"
+                            val newStatus = when (task.status) {
+                                "active" -> "paused"
+                                "paused" -> "active"
+                                "draft" -> "active"
+                                else -> "active"
+                            }
                             taskRepo.updateTask(task.copy(status = newStatus, updatedAt = System.currentTimeMillis()))
                         }
                     }
