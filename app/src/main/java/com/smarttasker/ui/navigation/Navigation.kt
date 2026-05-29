@@ -206,6 +206,9 @@ fun MainNavigation(
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onNavigateToTrace = { runId ->
+                        navController.navigate("trace_explainer/$runId")
                     }
                 )
             }

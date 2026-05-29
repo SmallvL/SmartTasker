@@ -30,7 +30,8 @@ fun HomeScreen(
     onCreateTask: (String) -> Unit = {},
     onTaskClick: (TaskEntity) -> Unit = {},
     onNavigateToTaskList: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToTrace: (String) -> Unit = {}
 ) {
     val recentTasks by taskRepo.getRecentTasks(5).collectAsState(initial = emptyList())
     val activeCount by taskRepo.getActiveTaskCount().collectAsState(initial = 0)
@@ -203,7 +204,7 @@ fun HomeScreen(
         if (failedRuns.isNotEmpty()) {
             item { SectionHeader("需要处理") }
             items(failedRuns) { run ->
-                SmartCard(onClick = { /* TODO: navigate to trace */ }) {
+                SmartCard(onClick = { onNavigateToTrace(run.runId) }) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
