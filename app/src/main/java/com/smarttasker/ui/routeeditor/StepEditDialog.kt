@@ -1,5 +1,10 @@
 package com.smarttasker.ui.routeeditor
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
@@ -11,7 +16,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,9 +26,9 @@ import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.ui.theme.*
 
 /**
- * 步骤编辑对话框
+ * 步骤编辑对话框（底部弹出）
  */
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StepEditDialog(
     step: RouteStepEntity,
@@ -29,7 +36,6 @@ fun StepEditDialog(
     onSave: (RouteStepEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var editedStep by remember { mutableStateOf(step) }
     var selectedType by remember { mutableStateOf(step.type) }
     var summary by remember { mutableStateOf(step.summary) }
     var locatorStrategy by remember { mutableStateOf(step.locatorStrategy) }
@@ -38,160 +44,246 @@ fun StepEditDialog(
     var maxRetries by remember { mutableStateOf(step.maxRetries.toString()) }
     var requiresConfirmation by remember { mutableStateOf(step.requiresConfirmation) }
 
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = false
+    )
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "编辑步骤 ${stepIndex + 1}",
-                color = LinearTextPrimary,
-                fontWeight = FontWeight.Medium
-            )
-        },
-        text = {
+        sheetState = sheetState,
+        containerColor = LinearBgSurface,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 步骤类型选择
+                // 拖拽指示条
+                Box(
+                    modifier = Modifier
+                        .padding(top = 12.dp, bottom = 8.dp)
+                        .size(width = 40.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(LinearTextTertiary.copy(alpha = 0.3f))
+                )
+                
+                // 标题
                 Text(
-                    text = "步骤类型",
-                    color = LinearTextSecondary,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+                    text = "编辑步骤 ${stepIndex + 1}",
+                    color = LinearTextPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
-                
-                StepTypeSelector(
-                    selectedType = selectedType,
-                    onTypeSelected = { selectedType = it }
-                )
-                
-                // 步骤摘要
-                OutlinedTextField(
-                    value = summary,
-                    onValueChange = { summary = it },
-                    label = { Text("步骤描述") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = LinearTextPrimary,
-                        unfocusedTextColor = LinearTextPrimary,
-                        focusedBorderColor = LinearBrandIndigo,
-                        unfocusedBorderColor = LinearTextTertiary
-                    )
-                )
-                
-                // 定位策略
-                Text(
-                    text = "定位策略",
-                    color = LinearTextSecondary,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
-                )
-                
-                LocatorStrategySelector(
-                    selectedStrategy = locatorStrategy,
-                    onStrategySelected = { locatorStrategy = it }
-                )
-                
-                // 定位值
-                OutlinedTextField(
-                    value = locatorValue,
-                    onValueChange = { locatorValue = it },
-                    label = { Text("定位值") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = LinearTextPrimary,
-                        unfocusedTextColor = LinearTextPrimary,
-                        focusedBorderColor = LinearBrandIndigo,
-                        unfocusedBorderColor = LinearTextTertiary
-                    )
-                )
-                
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // 步骤类型选择
+            SectionHeader(title = "步骤类型", icon = Icons.Default.Category)
+            
+            StepTypeSelector(
+                selectedType = selectedType,
+                onTypeSelected = { selectedType = it }
+            )
+            
+            // 步骤摘要
+            SectionHeader(title = "步骤描述", icon = Icons.Default.Description)
+            
+            OutlinedTextField(
+                value = summary,
+                onValueChange = { summary = it },
+                placeholder = { Text("输入步骤描述", color = LinearTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = LinearTextPrimary,
+                    unfocusedTextColor = LinearTextPrimary,
+                    focusedBorderColor = LinearBrandIndigo,
+                    unfocusedBorderColor = LinearBorderDefault,
+                    cursorColor = LinearBrandIndigo
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            
+            // 定位策略
+            SectionHeader(title = "定位策略", icon = Icons.Default.MyLocation)
+            
+            LocatorStrategySelector(
+                selectedStrategy = locatorStrategy,
+                onStrategySelected = { locatorStrategy = it }
+            )
+            
+            // 定位值
+            OutlinedTextField(
+                value = locatorValue,
+                onValueChange = { locatorValue = it },
+                placeholder = { Text("输入定位值", color = LinearTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = LinearTextPrimary,
+                    unfocusedTextColor = LinearTextPrimary,
+                    focusedBorderColor = LinearBrandIndigo,
+                    unfocusedBorderColor = LinearBorderDefault,
+                    cursorColor = LinearBrandIndigo
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            
+            // 高级设置
+            SectionHeader(title = "高级设置", icon = Icons.Default.Tune)
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 // 等待时间
                 OutlinedTextField(
                     value = waitTimeMs,
                     onValueChange = { waitTimeMs = it },
-                    label = { Text("等待时间 (ms)") },
-                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("等待时间", fontSize = 12.sp) },
+                    suffix = { Text("ms", fontSize = 12.sp, color = LinearTextTertiary) },
+                    modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = LinearTextPrimary,
                         unfocusedTextColor = LinearTextPrimary,
                         focusedBorderColor = LinearBrandIndigo,
-                        unfocusedBorderColor = LinearTextTertiary
-                    )
+                        unfocusedBorderColor = LinearBorderDefault,
+                        cursorColor = LinearBrandIndigo
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 
                 // 重试次数
                 OutlinedTextField(
                     value = maxRetries,
                     onValueChange = { maxRetries = it },
-                    label = { Text("最大重试次数") },
-                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("重试次数", fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = LinearTextPrimary,
                         unfocusedTextColor = LinearTextPrimary,
                         focusedBorderColor = LinearBrandIndigo,
-                        unfocusedBorderColor = LinearTextTertiary
-                    )
+                        unfocusedBorderColor = LinearBorderDefault,
+                        cursorColor = LinearBrandIndigo
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                
-                // 需要确认
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = requiresConfirmation,
-                        onCheckedChange = { requiresConfirmation = it },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = LinearBrandIndigo
-                        )
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
+            }
+            
+            // 需要确认开关
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(LinearBgPanel)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
                     Text(
-                        text = "执行前需要确认",
+                        text = "执行前确认",
                         color = LinearTextPrimary,
+                        fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val updatedStep = editedStep.copy(
-                        type = selectedType,
-                        summary = summary,
-                        locatorStrategy = locatorStrategy,
-                        locatorValue = locatorValue,
-                        waitTimeMs = waitTimeMs.toLongOrNull() ?: 1000L,
-                        maxRetries = maxRetries.toIntOrNull() ?: 2,
-                        requiresConfirmation = requiresConfirmation
+                    Text(
+                        text = "执行此步骤前需要用户确认",
+                        color = LinearTextTertiary,
+                        fontSize = 12.sp
                     )
-                    onSave(updatedStep)
                 }
+                
+                Switch(
+                    checked = requiresConfirmation,
+                    onCheckedChange = { requiresConfirmation = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = LinearBrandIndigo,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = LinearTextTertiary.copy(alpha = 0.3f)
+                    )
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 操作按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "保存",
-                    color = LinearBrandIndigo,
-                    fontWeight = FontWeight.Medium
-                )
+                // 取消按钮
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = LinearTextSecondary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("取消", modifier = Modifier.padding(vertical = 4.dp))
+                }
+                
+                // 保存按钮
+                Button(
+                    onClick = {
+                        val updatedStep = step.copy(
+                            type = selectedType,
+                            summary = summary,
+                            locatorStrategy = locatorStrategy,
+                            locatorValue = locatorValue,
+                            waitTimeMs = waitTimeMs.toLongOrNull() ?: 1000L,
+                            maxRetries = maxRetries.toIntOrNull() ?: 2,
+                            requiresConfirmation = requiresConfirmation
+                        )
+                        onSave(updatedStep)
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LinearBrandIndigo
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("保存", modifier = Modifier.padding(vertical = 4.dp))
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = "取消",
-                    color = LinearTextTertiary
-                )
-            }
-        },
-        containerColor = LinearBgSurface,
-        shape = RoundedCornerShape(16.dp)
-    )
+        }
+    }
+}
+
+/**
+ * 章节标题
+ */
+@Composable
+private fun SectionHeader(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = LinearBrandIndigo,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = title,
+            color = LinearTextPrimary,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp
+        )
+    }
 }
 
 /**
@@ -221,19 +313,34 @@ private fun StepTypeSelector(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         types.forEach { (type, name) ->
-            FilterChip(
-                selected = selectedType == type,
-                onClick = { onTypeSelected(type) },
-                label = {
-                    Text(
-                        text = name,
-                        color = if (selectedType == type) Color.White else LinearTextPrimary
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = LinearBrandIndigo
-                )
+            val isSelected = selectedType == type
+            val animatedColor by animateColorAsState(
+                targetValue = if (isSelected) LinearBrandIndigo else LinearBgPanel,
+                animationSpec = tween(durationMillis = 200),
+                label = "chipColor"
             )
+            
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(animatedColor)
+                    .then(
+                        if (isSelected) Modifier.border(
+                            width = 1.dp,
+                            color = LinearBrandIndigo.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) else Modifier
+                    )
+                    .clickable { onTypeSelected(type) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = name,
+                    color = if (isSelected) Color.White else LinearTextPrimary,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 14.sp
+                )
+            }
         }
     }
 }
@@ -261,19 +368,34 @@ private fun LocatorStrategySelector(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         strategies.forEach { (strategy, name) ->
-            FilterChip(
-                selected = selectedStrategy == strategy,
-                onClick = { onStrategySelected(strategy) },
-                label = {
-                    Text(
-                        text = name,
-                        color = if (selectedStrategy == strategy) Color.White else LinearTextPrimary
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = LinearBrandIndigo
-                )
+            val isSelected = selectedStrategy == strategy
+            val animatedColor by animateColorAsState(
+                targetValue = if (isSelected) LinearBrandIndigo else LinearBgPanel,
+                animationSpec = tween(durationMillis = 200),
+                label = "chipColor"
             )
+            
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(animatedColor)
+                    .then(
+                        if (isSelected) Modifier.border(
+                            width = 1.dp,
+                            color = LinearBrandIndigo.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) else Modifier
+                    )
+                    .clickable { onStrategySelected(strategy) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = name,
+                    color = if (isSelected) Color.White else LinearTextPrimary,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 14.sp
+                )
+            }
         }
     }
 }

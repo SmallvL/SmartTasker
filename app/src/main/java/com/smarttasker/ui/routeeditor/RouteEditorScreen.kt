@@ -1,5 +1,7 @@
 package com.smarttasker.ui.routeeditor
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -103,49 +105,66 @@ fun RouteEditorScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = LinearBrandIndigo
-                    )
-                }
-                
-                uiState.error != null -> {
-                    ErrorMessage(
-                        message = uiState.error!!,
-                        onRetry = { viewModel.clearError() },
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                
-                uiState.steps.isEmpty() -> {
-                    EmptyStepsMessage(
-                        onAddStep = { viewModel.addStep() },
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                
-                else -> {
-                    StepsList(
-                        steps = uiState.steps,
-                        onStepClick = { viewModel.selectStep(it) },
-                        onStepToggle = { viewModel.toggleStepEnabled(it) },
-                        onStepDelete = { viewModel.deleteStep(it) },
-                        onStepMove = { from, to -> viewModel.moveStep(from, to) },
-                        modifier = Modifier.fillMaxSize()
-                    )
+            AnimatedContent(
+                targetState = when {
+                    uiState.isLoading -> "loading"
+                    uiState.error != null -> "error"
+                    uiState.steps.isEmpty() -> "empty"
+                    else -> "content"
+                },
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) togetherWith
+                    fadeOut(animationSpec = tween(300))
+                },
+                label = "contentTransition"
+            ) { state ->
+                when (state) {
+                    "loading" -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = LinearBrandIndigo
+                        )
+                    }
+                    
+                    "error" -> {
+                        ErrorMessage(
+                            message = uiState.error!!,
+                            onRetry = { viewModel.clearError() },
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                    
+                    "empty" -> {
+                        EmptyStepsMessage(
+                            onAddStep = { viewModel.addStep() },
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                    
+                    "content" -> {
+                        StepsList(
+                            steps = uiState.steps,
+                            onStepClick = { viewModel.selectStep(it) },
+                            onStepToggle = { viewModel.toggleStepEnabled(it) },
+                            onStepDelete = { viewModel.deleteStep(it) },
+                            onStepMove = { from, to -> viewModel.moveStep(from, to) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
     }
 
-    // 步骤编辑对话框
+    // 步骤编辑对话框（底部弹出）
     if (uiState.showStepEditDialog && uiState.editingStep != null) {
         StepEditDialog(
             step = uiState.editingStep!!,
             stepIndex = uiState.selectedStepIndex,
-            onSave = { step -> viewModel.updateStep(uiState.selectedStepIndex, step) },
+            onSave = { step -> 
+                viewModel.updateStep(uiState.selectedStepIndex, step)
+                viewModel.dismissStepEditDialog()
+            },
             onDismiss = { viewModel.dismissStepEditDialog() }
         )
     }
@@ -168,7 +187,10 @@ private fun StepsList(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
-        itemsIndexed(steps) { index, step ->
+        itemsIndexed(
+            items = steps,
+            key = { _, step -> step.stepId }
+        ) { index, step ->
             StepItem(
                 step = step,
                 stepIndex = index,
@@ -195,117 +217,134 @@ private fun StepItem(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (step.enabled) LinearBgSurface else LinearBgSurface.copy(alpha = 0.5f)
-        ),
-        shape = RoundedCornerShape(12.dp)
+    var isVisible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(step.stepId) {
+        isVisible = true
+    }
+    
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInVertically(
+            initialOffsetY = { it / 2 },
+            animationSpec = tween(durationMillis = 300, easing = EaseOutCubic)
+        ) + fadeIn(animationSpec = tween(300))
     ) {
-        Row(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .clickable(onClick = onClick),
+            colors = CardDefaults.cardColors(
+                containerColor = if (step.enabled) LinearBgSurface else LinearBgSurface.copy(alpha = 0.5f)
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            // 步骤序号
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(LinearBrandIndigo.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${stepIndex + 1}",
-                    color = LinearBrandIndigo,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            // 步骤信息
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                // 步骤序号
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(LinearBrandIndigo.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // 步骤类型图标
-                    StepTypeIcon(type = step.type)
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    // 步骤类型
                     Text(
-                        text = getStepTypeName(step.type),
-                        color = LinearTextPrimary,
+                        text = "${stepIndex + 1}",
+                        color = LinearBrandIndigo,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 
-                // 步骤摘要
-                Text(
-                    text = step.summary.ifEmpty { "无描述" },
-                    color = LinearTextTertiary,
-                    fontSize = 12.sp,
-                    maxLines = 1
-                )
-            }
-            
-            // 操作按钮
-            Row {
-                // 启用/禁用开关
-                Switch(
-                    checked = step.enabled,
-                    onCheckedChange = { onToggle() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = LinearBrandIndigo,
-                        checkedTrackColor = LinearBrandIndigo.copy(alpha = 0.3f)
-                    )
-                )
-                
-                // 移动按钮
-                IconButton(
-                    onClick = onMoveUp,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowUp,
-                        contentDescription = "上移",
-                        tint = LinearTextTertiary,
-                        modifier = Modifier.size(20.dp)
+                // 步骤信息
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 步骤类型图标
+                        StepTypeIcon(type = step.type)
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        // 步骤类型
+                        Text(
+                            text = getStepTypeName(step.type),
+                            color = LinearTextPrimary,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // 步骤摘要
+                    Text(
+                        text = step.summary.ifEmpty { "无描述" },
+                        color = LinearTextTertiary,
+                        fontSize = 12.sp,
+                        maxLines = 1
                     )
                 }
                 
-                IconButton(
-                    onClick = onMoveDown,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "下移",
-                        tint = LinearTextTertiary,
-                        modifier = Modifier.size(20.dp)
+                // 操作按钮
+                Row {
+                    // 启用/禁用开关
+                    Switch(
+                        checked = step.enabled,
+                        onCheckedChange = { onToggle() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = LinearBrandIndigo,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = LinearTextTertiary.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.size(40.dp)
                     )
-                }
-                
-                // 删除按钮
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "删除",
-                        tint = LinearRed,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    
+                    // 移动按钮
+                    IconButton(
+                        onClick = onMoveUp,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "上移",
+                            tint = LinearTextTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    IconButton(
+                        onClick = onMoveDown,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "下移",
+                            tint = LinearTextTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    // 删除按钮
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "删除",
+                            tint = LinearRed,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -390,7 +429,8 @@ private fun ErrorMessage(
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(
                 containerColor = LinearBrandIndigo
-            )
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Text("重试")
         }
@@ -439,7 +479,8 @@ private fun EmptyStepsMessage(
             onClick = onAddStep,
             colors = ButtonDefaults.buttonColors(
                 containerColor = LinearBrandIndigo
-            )
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Add,

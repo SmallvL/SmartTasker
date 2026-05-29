@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
  val LinearRed = Color(0xFFef4444)
  val LinearYellow = Color(0xFFeab308)
  val LinearBlue = Color(0xFF3b82f6)
+ val LinearBorderDefault = Color(0xFF2a2b2c)
 
 // Light theme tokens
 object LightColors {
