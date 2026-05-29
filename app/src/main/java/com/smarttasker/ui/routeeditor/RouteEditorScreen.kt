@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.ui.theme.*
 
@@ -33,6 +34,11 @@ fun RouteEditorScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // 当对话框打开时，拦截返回键
+    BackHandler(enabled = uiState.showStepEditDialog) {
+        viewModel.dismissStepEditDialog()
+    }
 
     Scaffold(
         topBar = {
@@ -156,7 +162,7 @@ fun RouteEditorScreen(
         }
     }
 
-    // 步骤编辑对话框（底部弹出）
+    // 步骤编辑对话框
     if (uiState.showStepEditDialog && uiState.editingStep != null) {
         StepEditDialog(
             step = uiState.editingStep!!,
