@@ -96,32 +96,6 @@ fun MainNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val scope = rememberCoroutineScope()
-    
-    // 全局对话框状态追踪
-    var hasOpenDialog by remember { mutableStateOf(false) }
-    var dismissDialogCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
-    
-    // 当有对话框打开时，拦截系统返回键
-    val backCallback = remember {
-        object : androidx.activity.OnBackPressedCallback(false) {
-            override fun handleOnBackPressed() {
-                dismissDialogCallback?.invoke()
-                hasOpenDialog = false
-            }
-        }
-    }
-    
-    LaunchedEffect(hasOpenDialog) {
-        backCallback.isEnabled = hasOpenDialog
-    }
-    
-    val activity = androidx.compose.ui.platform.LocalContext.current as? androidx.activity.ComponentActivity
-    DisposableEffect(activity) {
-        activity?.onBackPressedDispatcher?.addCallback(backCallback)
-        onDispose {
-            backCallback.remove()
-        }
-    }
 
     // TaskViewModel for the tasks tab
     val taskViewModel = remember { TaskViewModel(taskRepo) }
@@ -519,28 +493,11 @@ fun MainNavigation(
                             routeId = routeId
                         )
                     }
-                    val editorUiState by routeEditorViewModel.uiState.collectAsState()
-                    
-                    // 同步对话框状态到全局
-                    LaunchedEffect(editorUiState.showStepEditDialog) {
-                        hasOpenDialog = editorUiState.showStepEditDialog
-                        if (editorUiState.showStepEditDialog) {
-                            dismissDialogCallback = { routeEditorViewModel.dismissStepEditDialog() }
-                        }
-                    }
-                    
-                 RouteEditorScreen(
-                     viewModel = routeEditorViewModel,
-                     onNavigateBack = {
-                         if (editorUiState.showStepEditDialog) {
-                             routeEditorViewModel.dismissStepEditDialog()
-                             hasOpenDialog = false
-                             dismissDialogCallback = null
-                         } else {
-                             navController.popBackStack()
-                         }
-                     }
-                 )
+
+                    RouteEditorScreen(
+                        viewModel = routeEditorViewModel,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
                 }
 
                 // ===== Permission Doctor =====

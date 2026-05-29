@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.BackHandler
 import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.ui.theme.*
 
@@ -35,10 +34,7 @@ fun RouteEditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // 当对话框打开时，拦截返回键
-    BackHandler(enabled = uiState.showStepEditDialog) {
-        viewModel.dismissStepEditDialog()
-    }
+    // 返回键拦截已移至 Navigation.kt 的 composable 块中
 
     Scaffold(
         topBar = {
@@ -159,20 +155,20 @@ fun RouteEditorScreen(
                     }
                 }
             }
-        }
-    }
 
-    // 步骤编辑对话框
-    if (uiState.showStepEditDialog && uiState.editingStep != null) {
-        StepEditDialog(
-            step = uiState.editingStep!!,
-            stepIndex = uiState.selectedStepIndex,
-            onSave = { step -> 
-                viewModel.updateStep(uiState.selectedStepIndex, step)
-                viewModel.dismissStepEditDialog()
-            },
-            onDismiss = { viewModel.dismissStepEditDialog() }
-        )
+            // 步骤编辑对话框（Box 覆盖层，点击外部关闭）
+            if (uiState.showStepEditDialog && uiState.editingStep != null) {
+                StepEditDialog(
+                    step = uiState.editingStep!!,
+                    stepIndex = uiState.selectedStepIndex,
+                    onSave = { step ->
+                        viewModel.updateStep(uiState.selectedStepIndex, step)
+                        viewModel.dismissStepEditDialog()
+                    },
+                    onDismiss = { viewModel.dismissStepEditDialog() }
+                )
+            }
+        }
     }
 }
 

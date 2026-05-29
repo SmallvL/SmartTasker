@@ -12,6 +12,12 @@
 
 ---
 
+## [0.9.3] — 2026-05-28
+
+### Fixed
+- **步骤编辑对话框返回键问题** 🔴：在 API 34 + Navigation Compose 2.7.4 上，`BackHandler` 和 `OnBackPressedCallback` 均无法拦截系统返回键（Navigation 内部回调优先级更高）。改为使用 Box 覆盖层方案，支持点击黑色遮罩区域和取消按钮关闭对话框
+- **清理无效代码** — 移除 Navigation.kt 中两套无效的 `OnBackPressedCallback` 和全局对话框状态追踪代码
+
 ## [0.9.2] — 2026-05-28
 
 ### Changed
