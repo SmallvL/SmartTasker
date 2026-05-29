@@ -27,6 +27,8 @@ import com.smarttasker.core.bridge.CoreStatus
 import com.smarttasker.data.entity.TaskEntity
 import com.smarttasker.data.repository.TaskRepository
 import com.smarttasker.data.repository.RunRepository
+import com.smarttasker.service.ExecutionState
+import com.smarttasker.service.TaskExecutionService
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
 
@@ -35,6 +37,7 @@ fun HomeScreen(
     taskRepo: TaskRepository,
     runRepo: RunRepository,
     coreBridgeManager: CoreBridgeManager,
+    executionService: TaskExecutionService? = null,
     onCreateTask: (String) -> Unit = {},
     onTaskClick: (TaskEntity) -> Unit = {},
     onNavigateToTaskList: () -> Unit = {},
@@ -49,7 +52,10 @@ fun HomeScreen(
     val failedCount by runRepo.getTodayFailedCount().collectAsState(initial = 0)
     val modelCalls by runRepo.getTodayModelCalls().collectAsState(initial = 0)
     val failedRuns by runRepo.getRecentFailedRuns(3).collectAsState(initial = emptyList())
-    
+
+    // Execution state for real-time feedback
+    val executionState by executionService?.executionState?.collectAsState() ?: remember { mutableStateOf(ExecutionState.Idle) }
+
     // CoreBridge real status
     val coreStatus by coreBridgeManager.coreStatus.collectAsState()
     val isChecking by coreBridgeManager.isChecking.collectAsState()
@@ -164,6 +170,59 @@ fun HomeScreen(
                             contentDescription = null,
                             tint = SmartColors.textTertiary()
                         )
+                    }
+                }
+            }
+        }
+
+        // Real-time execution status
+        if (executionState is ExecutionState.Running || executionState is ExecutionState.Submitting) {
+            item {
+                SmartCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 3.dp,
+                            color = SmartColors.accent()
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                when (executionState) {
+                                    is ExecutionState.Submitting -> "正在提交任务..."
+                                    is ExecutionState.Running -> "任务执行中"
+                                    else -> ""
+                                },
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 15.sp
+                            )
+                            if (executionState is ExecutionState.Running) {
+                                val running = executionState as ExecutionState.Running
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    when (running.phase) {
+                                        "analyzing" -> "🔍 分析任务..."
+                                        "launching" -> "🚀 启动应用..."
+                                        "navigating" -> "🧭 导航中..."
+                                        "interacting" -> "👆 操作中..."
+                                        "verifying" -> "✅ 验证结果..."
+                                        else -> "⏳ ${running.phase}"
+                                    },
+                                    fontSize = 13.sp,
+                                    color = SmartColors.textSecondary()
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = running.progress,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = SmartColors.accent(),
+                                    trackColor = SmartColors.accent().copy(alpha = 0.2f)
+                                )
+                            }
+                        }
                     }
                 }
             }

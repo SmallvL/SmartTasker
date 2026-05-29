@@ -188,6 +188,7 @@ fun MainNavigation(
                     taskRepo = taskRepo,
                     runRepo = runRepo,
                     coreBridgeManager = coreBridgeManager,
+                    executionService = executionService,
                     onCreateTask = { input ->
                         // Navigate to create with pre-filled input
                         navController.navigate("create?input=${java.net.URLEncoder.encode(input, "UTF-8")}")
