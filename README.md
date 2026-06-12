@@ -2,6 +2,8 @@
 
 > 一句话，搞定一切。你的手机自动化超级助手。
 
+> ⚠️ **第一原则**：本项目以 [SmallvL/SmartTasker](https://github.com/SmallvL/SmartTasker) 为唯一权威上游。任何决策与改动须遵守 [PRODUCT_DIRECTION.md](./PRODUCT_DIRECTION.md)。本地旧项目 `D:\1_AIagnet\SMARTTASK\android\` 已 DEPRECATED。
+
 SmartTasker 是一个 Android 端的超级管家，类似超级 Siri、超级小爱同学。用自然语言描述你想要完成的事情，SmartTasker 就能自动帮你在手机上执行。
 
 **核心理念**：像和真人管家说话一样操控手机。

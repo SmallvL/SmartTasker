@@ -5,6 +5,10 @@
 > 日期：2026-05-24  
 > 底层参考：AutoLXB 二次开发 → 独立 DirectCoreBridge
 
+> ⚠️ **第一原则（2026-06-12 确立）**：本项目以 GitHub `SmallvL/SmartTasker` 仓库为唯一权威上游。
+> 本地旧项目 `D:\1_AIagnet\SMARTTASK\android\` 已 DEPRECATED，不再维护。
+> 详见项目根目录 [PRODUCT_DIRECTION.md](../PRODUCT_DIRECTION.md)。
+
 ## 1. 文档包目标
 
 本文件是给产品、开发、设计、测试与 AI coding agent 使用的入口文档。它将原来的单一 PRD 拆分为多个可独立读取、可引用、可执行的 Markdown 文档，方便后续开发与进度管理。

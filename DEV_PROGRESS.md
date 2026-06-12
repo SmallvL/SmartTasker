@@ -1,5 +1,9 @@
 # SmartTasker 开发进度
 
+> ⚠️ **第一原则（2026-06-12 确立）**：本项目以 GitHub `SmallvL/SmartTasker` 仓库为唯一权威上游。
+> 本地旧项目 `D:\1_AIagnet\SMARTTASK\android\` 已 DEPRECATED（Java/View 栈，与本项目 Kotlin/Compose 不同），不再维护。
+> 详见 [PRODUCT_DIRECTION.md](./PRODUCT_DIRECTION.md)。
+
 ## 产品定位
 
 **手机超级管家** — 类似超级 Siri / 超级小爱，一句话完成复杂任务。
