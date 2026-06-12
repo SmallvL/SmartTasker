@@ -12,6 +12,19 @@
 
 ---
 
+## [0.9.8] — 2026-06-13
+
+### Fixed
+- **SH 模式录制无提示 (Issue #1)** 🔴：`RecordingOverlayService.startRecording()` 在做能力检查前会先 `startForeground()`，导致 SH 模式失败时用户看不到任何反馈，UI 一直显示"录制中..."。修复：
+  - 启动 Service 后先检查 `ShellExecutor.canRecord()`，SH 模式直接 Toast + 广播 `ACTION_RECORD_START_FAILED` 后 `stopSelf()`
+  - 不进入前台，节省系统资源
+  - `ManualRecordingScreen` 注册 `BroadcastReceiver` 接收失败广播，撤销 `isRecording=true` 乐观状态并显示原因
+  - 悬浮窗权限缺失时同样走 `notifyStartFailed()` 路径
+- **org.json 重复依赖导致真机 Native Crash (Issue #2)** 🔴：`app/build.gradle.kts` 中 `org.json:json:20231013` 被声明两次（第 71 行和第 113 行），Gradle 解析时可能产生重复 dex 条目。删除重复声明，保留唯一一处
+
+### Changed
+- 顶部 JSON 依赖区加注释，说明 `org.json` 已统一在前面声明
+
 ## [0.9.7] — 2026-05-29
 
 ### Added

@@ -27,6 +27,14 @@ class RecordingOverlayService : Service() {
         const val ACTION_INSERT_WAIT = "com.smarttasker.action.RECORD_INSERT_WAIT"
         const val ACTION_INSERT_SCREENSHOT = "com.smarttasker.action.RECORD_INSERT_SCREENSHOT"
 
+        /**
+         * Broadcast action emitted when the service refuses to start (e.g. SH mode without
+         * ADB/root). UI screens can subscribe to it to roll back their optimistic
+         * "isRecording=true" state and surface the error.
+         */
+        const val ACTION_RECORD_START_FAILED = "com.smarttasker.action.RECORD_START_FAILED"
+        const val EXTRA_FAIL_REASON = "fail_reason"
+
         private const val CHANNEL_ID = "smarttasker_recording"
         private const val NOTIFICATION_ID = 1004
     }
@@ -73,22 +81,37 @@ class RecordingOverlayService : Service() {
     private fun startRecording() {
         if (!Settings.canDrawOverlays(this)) {
             DebugLog.e("RecOverlay", "Cannot draw overlays: permission not granted")
+            notifyStartFailed("未授予悬浮窗权限，无法开始录制")
             stopSelf()
             return
         }
-        val notification = buildNotification("SmartTask 正在录制")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
-
-        // Pass ADB executor for TLS streaming (getevent needs shell access to /dev/input)
-        val adbExecutor = com.smarttasker.core.direct.ShellExecutor.getAdbExecutor()
-        sessionManager = RecordingSessionManager(applicationContext, adbExecutor)
+        // [BugFix #1] Pre-flight capability check before promoting to foreground.
+        // SH mode is not sufficient for getevent streaming; without this guard the service
+        // would still startForeground + show a notification, leaving the user with no
+        // actionable feedback when recording silently fails.
         scope.launch {
+            val capability = com.smarttasker.core.direct.ShellExecutor.getCapabilityDescription()
+            val canRecord = com.smarttasker.core.direct.ShellExecutor.canRecord()
+            if (!canRecord) {
+                val reason = "当前 Shell 模式不支持录制：$capability\n请开启无线调试并连接后重试"
+                DebugLog.e("RecOverlay", "Refusing to start: $reason")
+                notifyStartFailed(reason)
+                stopSelf()
+                return@launch
+            }
+            val notification = buildNotification("SmartTask 正在录制")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+
+            // Pass ADB executor for TLS streaming (getevent needs shell access to /dev/input)
+            val adbExecutor = com.smarttasker.core.direct.ShellExecutor.getAdbExecutor()
+            sessionManager = RecordingSessionManager(applicationContext, adbExecutor)
             val manager = sessionManager ?: run {
                 DebugLog.e("RecOverlay", "Session manager is null")
+                notifyStartFailed("录制管理器初始化失败")
                 stopSelf()
                 return@launch
             }
@@ -105,6 +128,17 @@ class RecordingOverlayService : Service() {
                 stopSelf()
             }
         }
+    }
+
+    private fun notifyStartFailed(reason: String) {
+        // Toast so the user sees something immediately even if the UI screen is not visible.
+        android.widget.Toast.makeText(applicationContext, reason, android.widget.Toast.LENGTH_LONG).show()
+        // Broadcast so the UI screen can roll back its optimistic "isRecording=true".
+        val broadcast = Intent(ACTION_RECORD_START_FAILED).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_FAIL_REASON, reason)
+        }
+        sendBroadcast(broadcast)
     }
 
     private fun stopRecording() {

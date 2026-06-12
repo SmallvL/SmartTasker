@@ -54,6 +54,32 @@ fun ManualRecordingScreen(
         }
     }
 
+    // [BugFix #1] Roll back the optimistic "isRecording=true" state when the
+    // overlay service refuses to start (e.g. SH mode). Without this, the UI
+    // would happily render "录制中..." forever with no overlay actually showing.
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action == RecordingOverlayService.ACTION_RECORD_START_FAILED) {
+                    val reason = intent.getStringExtra(RecordingOverlayService.EXTRA_FAIL_REASON)
+                        ?: "录制启动失败"
+                    DebugLog.e("ManualRec", "Service reported start failure: $reason")
+                    isRecording = false
+                    recordingStopped = false
+                    recordingError = reason
+                }
+            }
+        }
+        val filter = IntentFilter(RecordingOverlayService.ACTION_RECORD_START_FAILED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+
     // Load saved route when recording stops — poll up to 10s for file to appear
     LaunchedEffect(recordingStopped) {
         if (recordingStopped) {
