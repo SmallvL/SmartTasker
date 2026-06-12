@@ -63,10 +63,15 @@
 - 执行阶段显示（🔍分析/🚀启动/🧭导航/👆操作/✅验证）
 - 进度条实时更新
 
-**Bug 修复**
-- 修复草稿状态任务无法启用
-- 任务管理 Bug 修复
-- 路线编辑器 5 个关键 Bug 修复
+**Bug 修复 (v0.9.8)**
+- 🔴 修复 SH 模式录制无提示（Issue #1）：`RecordingOverlayService` 在 `startForeground()` 之前先做 `canRecord()` 预检；SH 模式失败时直接 Toast + 广播 `ACTION_RECORD_START_FAILED` 后 `stopSelf()`；`ManualRecordingScreen` 注册 `BroadcastReceiver` 接收失败广播，撤销乐观状态
+- 🔴 修复 org.json 重复依赖（Issue #2）：`app/build.gradle.kts` 中 `org.json:json:20231013` 声明两次，删除重复一处
+
+**测试框架 (v0.9.8)**
+- 单元测试从 13 扩到 80+ 覆盖：`core/parser/`, `core/retry/`, `core/protocol/`, `core/record/parser/`, `core/record/gesture/`, `core/direct/`
+- Espresso 集成测试：`MainActivityTest`, `BottomNavigationTest`, `RecordingOverlayServiceTest`
+- CI (`.github/workflows/test.yml`)：unit-test 在 ubuntu-latest；android-test 在 self-hosted MuMu runner
+- 测试手册：`.github/TESTING.md`
 
 ### 📋 后续优化
 - LLM 解析集成（需配置 API Key）
@@ -79,6 +84,7 @@
 
 | 版本 | 日期 | 功能 |
 |------|------|------|
+| v0.9.8 | 2026-06-13 | SH 录制无提示修复 + org.json 重复依赖修复 + 测试框架 |
 | v0.9.7 | 2026-05-29 | 任务执行实时状态反馈 + 草稿状态修复 |
 | v0.9.6 | 2026-05-29 | 首页任务卡片交互优化 + 长按菜单 |
 | v0.9.5 | 2026-05-29 | 自然语言解析增强（70+应用/英文支持） |
