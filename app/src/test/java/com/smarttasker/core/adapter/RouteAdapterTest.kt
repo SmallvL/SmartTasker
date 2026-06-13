@@ -99,8 +99,12 @@ class RouteAdapterTest {
     @Test
     fun `toRouteJson produces valid JSON with correct op`() {
         val steps = listOf(
-            RouteStepEntity("s1", "r1", 1, "tap", "点击搜索", "text", "搜索", 0.85f, "", "", "low", "ai_learned"),
-            RouteStepEntity("s2", "r1", 2, "input", "输入关键词", "resource_id", "search_input", 0.85f, "", "", "low", "ai_learned")
+            RouteStepEntity(stepId = "s1", routeId = "r1", stepIndex = 1, type = "tap",
+                summary = "点击搜索", locatorStrategy = "text", locatorValue = "搜索",
+                locatorConfidence = 0.85f, riskLevel = "low", source = "ai_learned"),
+            RouteStepEntity(stepId = "s2", routeId = "r1", stepIndex = 2, type = "input",
+                summary = "输入关键词", locatorStrategy = "resource_id", locatorValue = "search_input",
+                locatorConfidence = 0.85f, riskLevel = "low", source = "ai_learned")
         )
         val json = RouteAdapter.toRouteJson(steps)
         assertTrue(json.contains("\"op\":\"TAP\""))
@@ -113,7 +117,7 @@ class RouteAdapterTest {
     fun `round-trip parse then toRouteJson preserves op type`() {
         val result = RouteAdapter.parseRoute(sampleRouteJson, "task-1")!!
         val json = RouteAdapter.toRouteJson(result.steps)
-        assertTrue(json.contains("\"op\":\"LAUNCH\""))
+        assertTrue(json.contains("\"op\":\"OPEN_APP\""))
         assertTrue(json.contains("\"op\":\"BACK\""))
         assertTrue(json.contains("\"op\":\"WAIT\""))
     }

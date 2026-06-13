@@ -11,7 +11,7 @@ class RetryExecutorTest {
     @Test
     fun `execute returns value on first success`() = runTest {
         val executor = RetryExecutor(RetryPolicy.NONE)
-        val result = executor.execute { 42 }
+        val result = executor.execute(operation = { 42 })
         assertEquals(42, result)
     }
 
@@ -19,10 +19,10 @@ class RetryExecutorTest {
     fun `execute retries on failure and succeeds`() = runTest {
         var attempt = 0
         val executor = RetryExecutor(RetryPolicy(maxRetries = 2, initialDelayMs = 0, maxDelayMs = 0, backoffMultiplier = 1.0))
-        val result = executor.execute {
+        val result = executor.execute(operation = {
             attempt++
             if (attempt < 3) throw RuntimeException("fail") else "ok"
-        }
+        })
         assertEquals("ok", result)
         assertEquals(3, attempt)
     }
@@ -30,7 +30,7 @@ class RetryExecutorTest {
     @Test(expected = RuntimeException::class)
     fun `execute throws after max retries`() = runTest {
         val executor = RetryExecutor(RetryPolicy(maxRetries = 1, initialDelayMs = 0, maxDelayMs = 0, backoffMultiplier = 1.0))
-        executor.execute<String> { throw RuntimeException("always fail") }
+        executor.execute<String>(operation = { throw RuntimeException("always fail") })
     }
 
     @Test
@@ -40,10 +40,10 @@ class RetryExecutorTest {
             retryableExceptions = setOf(IllegalStateException::class.java))
         val executor = RetryExecutor(policy)
         try {
-            executor.execute {
+            executor.execute(operation = {
                 attempt++
                 throw RuntimeException("not retryable")
-            }
+            })
         } catch (_: RuntimeException) {
             // expected
         }
@@ -53,7 +53,7 @@ class RetryExecutorTest {
     @Test
     fun `executeCatching returns success on first try`() = runTest {
         val executor = RetryExecutor(RetryPolicy.NONE)
-        val result = executor.executeCatching { 99 }
+        val result = executor.executeCatching(operation = { 99 })
         assertTrue(result.isSuccess)
         assertEquals(99, result.getOrNull())
     }
@@ -61,7 +61,7 @@ class RetryExecutorTest {
     @Test
     fun `executeCatching returns failure after retries exhausted`() = runTest {
         val executor = RetryExecutor(RetryPolicy(maxRetries = 1, initialDelayMs = 0, maxDelayMs = 0, backoffMultiplier = 1.0))
-        val result = executor.executeCatching<String> { throw RuntimeException("fail") }
+        val result = executor.executeCatching<String>(operation = { throw RuntimeException("fail") })
         assertTrue(result.isFailure)
     }
 

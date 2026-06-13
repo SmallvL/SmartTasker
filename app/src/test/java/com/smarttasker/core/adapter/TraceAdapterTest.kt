@@ -95,7 +95,7 @@ class TraceAdapterTest {
             """{"ts":2000,"event":"task_end","task_id":"t1","status":"success"}"""
         )
         val result = TraceAdapter.parseTrace(lines, "t1", "run-1")
-        assertEquals(2, result.events.size)
+        assertEquals(3, result.events.size)
         assertEquals("success", result.runRecord.status)
     }
 

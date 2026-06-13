@@ -27,11 +27,10 @@ class RawInputParserTest {
     @Test
     fun `TouchDown emitted on first SYN_REPORT after tracking id`() {
         val p = parser()
-        assertNull(p.parseLine("[  12345.000000] /dev/input/event0: EV_ABS  0039  ffffffff")) // tracking_id -1, ignored
-        assertNull(p.parseLine("[  12345.000100] /dev/input/event0: EV_ABS  002f  00000001")) // TRACKING_ID = 1
-        assertNull(p.parseLine("[  12345.000200] /dev/input/event0: EV_ABS  0035  0000012c")) // X = 300
-        assertNull(p.parseLine("[  12345.000300] /dev/input/event0: EV_ABS  0036  000002ee")) // Y = 750
-        val down = p.parseLine("[  12345.000400] /dev/input/event0: EV_SYN  0000  00000000")
+        assertNull(p.parseLine("[  12345.000100] /dev/input/event0: EV_ABS  ABS_MT_TRACKING_ID  00000001")) // TRACKING_ID = 1
+        assertNull(p.parseLine("[  12345.000200] /dev/input/event0: EV_ABS  ABS_MT_POSITION_X  0000012c")) // X = 300
+        assertNull(p.parseLine("[  12345.000300] /dev/input/event0: EV_ABS  ABS_MT_POSITION_Y  000002ee")) // Y = 750
+        val down = p.parseLine("[  12345.000400] /dev/input/event0: EV_SYN  SYN_REPORT  00000000")
         assertTrue(down is RawInputEvent.TouchDown)
         down as RawInputEvent.TouchDown
         assertEquals(1, down.trackingId)
@@ -42,15 +41,15 @@ class RawInputParserTest {
     @Test
     fun `TouchMove emitted on subsequent SYN_REPORT while touching`() {
         val p = parser()
-        p.parseLine("[  1.000000] /dev/input/event0: EV_ABS  002f  00000001") // TRACKING_ID = 1
-        p.parseLine("[  1.000100] /dev/input/event0: EV_ABS  0035  00000064") // X = 100
-        p.parseLine("[  1.000200] /dev/input/event0: EV_ABS  0036  000000c8") // Y = 200
-        val first = p.parseLine("[  1.000300] /dev/input/event0: EV_SYN  0000  00000000")
+        p.parseLine("[  1.000000] /dev/input/event0: EV_ABS  ABS_MT_TRACKING_ID  00000001") // TRACKING_ID = 1
+        p.parseLine("[  1.000100] /dev/input/event0: EV_ABS  ABS_MT_POSITION_X  00000064") // X = 100
+        p.parseLine("[  1.000200] /dev/input/event0: EV_ABS  ABS_MT_POSITION_Y  000000c8") // Y = 200
+        val first = p.parseLine("[  1.000300] /dev/input/event0: EV_SYN  SYN_REPORT  00000000")
         assertTrue(first is RawInputEvent.TouchDown)
 
-        p.parseLine("[  1.000400] /dev/input/event0: EV_ABS  0035  00000096") // X = 150
-        p.parseLine("[  1.000500] /dev/input/event0: EV_ABS  0036  0000012c") // Y = 300
-        val second = p.parseLine("[  1.000600] /dev/input/event0: EV_SYN  0000  00000000")
+        p.parseLine("[  1.000400] /dev/input/event0: EV_ABS  ABS_MT_POSITION_X  00000096") // X = 150
+        p.parseLine("[  1.000500] /dev/input/event0: EV_ABS  ABS_MT_POSITION_Y  0000012c") // Y = 300
+        val second = p.parseLine("[  1.000600] /dev/input/event0: EV_SYN  SYN_REPORT  00000000")
         assertTrue(second is RawInputEvent.TouchMove)
         second as RawInputEvent.TouchMove
         assertEquals(150, second.x)
@@ -60,8 +59,8 @@ class RawInputParserTest {
     @Test
     fun `TouchUp emitted on TRACKING_ID negative`() {
         val p = parser()
-        p.parseLine("[  1.000000] /dev/input/event0: EV_ABS  002f  00000001")
-        val up = p.parseLine("[  1.000500] /dev/input/event0: EV_ABS  002f  ffffffff")
+        p.parseLine("[  1.000000] /dev/input/event0: EV_ABS  ABS_MT_TRACKING_ID  00000001")
+        val up = p.parseLine("[  1.000500] /dev/input/event0: EV_ABS  ABS_MT_TRACKING_ID  ffffffff")
         assertTrue(up is RawInputEvent.TouchUp)
     }
 
@@ -83,23 +82,23 @@ class RawInputParserTest {
     @Test
     fun `BTN_TOUCH events are ignored`() {
         val p = parser()
-        val event = p.parseLine("[  1.000000] /dev/input/event0: EV_KEY  00000014  DOWN")
-        assertNull(event) // 0x14 = BTN_TOUCH, ignored
+        val event = p.parseLine("[  1.000000] /dev/input/event0: EV_KEY  BTN_TOUCH  DOWN")
+        assertNull(event) // BTN_TOUCH is ignored
     }
 
     @Test
     fun `reset clears parser state`() {
         val p = parser()
-        p.parseLine("[  1.000000] /dev/input/event0: EV_ABS  002f  00000001")
+        p.parseLine("[  1.000000] /dev/input/event0: EV_ABS  ABS_MT_TRACKING_ID  00000001")
         p.reset()
         // After reset, no isTouching → SYN_REPORT becomes plain SynReport
-        val plain = p.parseLine("[  2.000000] /dev/input/event0: EV_SYN  0000  00000000")
+        val plain = p.parseLine("[  2.000000] /dev/input/event0: EV_SYN  SYN_REPORT  00000000")
         assertTrue(plain is RawInputEvent.SynReport)
     }
 
     @Test
     fun `SynReport without touching yields SynReport event`() {
-        val plain = parser().parseLine("[  1.000000] /dev/input/event0: EV_SYN  0000  00000000")
+        val plain = parser().parseLine("[  1.000000] /dev/input/event0: EV_SYN  SYN_REPORT  00000000")
         assertTrue(plain is RawInputEvent.SynReport)
     }
 

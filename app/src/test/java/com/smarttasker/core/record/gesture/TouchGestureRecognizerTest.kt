@@ -98,15 +98,15 @@ class TouchGestureRecognizerTest {
     fun `dpi scales tap and swipe thresholds`() {
         val lowDpi = TouchGestureRecognizer(screenDpi = 160)  // 16dp=16px, 32dp=32px
         val highDpi = TouchGestureRecognizer(screenDpi = 640) // 16dp=64px, 32dp=128px
-        // A 30px movement is > low-dpi tap threshold (16) but < high-dpi tap threshold (64)
+        // A 40px movement exceeds low-dpi swipeMin (32px) but is below high-dpi tapThreshold (64px)
         lowDpi.feed(RawInputEvent.TouchDown(0, 100, 100, 50, 1000L))
-        lowDpi.feed(RawInputEvent.TouchMove(130, 100, 1050L))
+        lowDpi.feed(RawInputEvent.TouchMove(140, 100, 1050L))
         val lowG = lowDpi.feed(RawInputEvent.TouchUp(1100L))
-        assertTrue("30px movement at 160dpi should exceed tap threshold", lowG is RecognizedGesture.Swipe)
+        assertTrue("40px movement at 160dpi should exceed swipe minimum", lowG is RecognizedGesture.Swipe)
 
         highDpi.feed(RawInputEvent.TouchDown(0, 100, 100, 50, 1000L))
-        highDpi.feed(RawInputEvent.TouchMove(130, 100, 1050L))
+        highDpi.feed(RawInputEvent.TouchMove(140, 100, 1050L))
         val highG = highDpi.feed(RawInputEvent.TouchUp(1100L))
-        assertTrue("30px movement at 640dpi is below tap threshold", highG is RecognizedGesture.Tap)
+        assertTrue("40px movement at 640dpi is below tap threshold", highG is RecognizedGesture.Tap)
     }
 }

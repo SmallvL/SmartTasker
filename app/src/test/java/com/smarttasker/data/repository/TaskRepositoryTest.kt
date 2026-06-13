@@ -66,18 +66,16 @@ class TaskRepositoryTest {
 
     @Test
     fun `getTaskById returns null on exception`() = runTest {
-        val dao = mock<TaskDao> {
-            onBlocking { getTaskById("bad") } throw RuntimeException("db error")
-        }
+        val dao = mock<TaskDao>()
+        whenever(dao.getTaskById("bad")).thenThrow(RuntimeException("db error"))
         val repo = TaskRepository(dao)
         assertNull(repo.getTaskById("bad"))
     }
 
     @Test
     fun `updateTask swallows exception`() = runTest {
-        val dao = mock<TaskDao> {
-            onBlocking { updateTask(any()) } throw RuntimeException("db error")
-        }
+        val dao = mock<TaskDao>()
+        whenever(dao.updateTask(any())).thenThrow(RuntimeException("db error"))
         val repo = TaskRepository(dao)
         // Should not throw
         repo.updateTask(mockTask())
@@ -85,9 +83,8 @@ class TaskRepositoryTest {
 
     @Test
     fun `insertTask swallows exception`() = runTest {
-        val dao = mock<TaskDao> {
-            onBlocking { insertTask(any()) } throw RuntimeException("db error")
-        }
+        val dao = mock<TaskDao>()
+        whenever(dao.insertTask(any())).thenThrow(RuntimeException("db error"))
         val repo = TaskRepository(dao)
         repo.insertTask(mockTask())
     }

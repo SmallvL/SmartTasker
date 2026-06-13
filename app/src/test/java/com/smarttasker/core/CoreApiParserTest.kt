@@ -43,8 +43,8 @@ class CoreApiParserTest {
         assertEquals(2, apps.size)
         // Dedup: first entry with label wins
         assertEquals("微信", apps.find { it.packageName == "com.tencent.mm" }!!.label)
-        // Sorted by label
-        assertEquals("淘宝", apps[0].label)
+        // Sorted by label (Unicode order: 微 < 淘)
+        assertEquals("微信", apps[0].label)
     }
 
     @Test

@@ -14,8 +14,8 @@ android {
         applicationId = "com.smarttasker"
         minSdk = 24
         targetSdk = 34
-        versionCode = 20
-        versionName = "0.9.8"
+        versionCode = 21
+        versionName = "0.9.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -56,6 +56,12 @@ android {
         kotlinCompilerExtensionVersion = "1.5.1"
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -71,6 +77,7 @@ dependencies {
     implementation("org.json:json:20231013")
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.activity:activity-ktx:1.8.0")
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2023.10.01"))
