@@ -113,8 +113,23 @@
         <!-- 录制悬浮控制条前台服务 -->
         <service
             android:name=".core.record.ui.RecordingOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:exported="true"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="com.smarttasker.action.RECORD_START" />
+                <action android:name="com.smarttasker.action.RECORD_STOP" />
+            </intent-filter>
+        </service>
+
+        <!-- 路线回放前台服务 -->
+        <service
+            android:name=".core.playback.RoutePlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="com.smarttasker.action.PLAY_ROUTE" />
+            </intent-filter>
+        </service>
 
         <!-- 通知监听服务 -->
         <service

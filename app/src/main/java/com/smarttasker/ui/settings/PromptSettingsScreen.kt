@@ -1,21 +1,24 @@
 package com.smarttasker.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Restore
-import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.data.repository.SettingsRepository
+import com.smarttasker.ui.common.IconBox
+import com.smarttasker.ui.common.SectionHeaderWithIcon
 import com.smarttasker.ui.common.SmartCard
 import com.smarttasker.ui.common.SmartButton
 import com.smarttasker.ui.common.SmartSecondaryButton
@@ -38,52 +41,64 @@ fun PromptSettingsScreen(settingsRepo: SettingsRepository, onBack: () -> Unit) {
         "{time}" to "当前时间"
     )
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Prompt 设置") },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+    val sectionColor = Color(0xFF8B5CF6)
 
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Prompt 设置", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = "返回")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(padding)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
+            // Header card with icon box
             item {
                 SmartCard {
-                    Icon(
-                        Icons.Outlined.Psychology,
-                        contentDescription = null,
-                        tint = SmartColors.accent(),
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "自定义 AI 解析提示词",
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = "修改提示词可以影响 AI 如何理解你的任务描述",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        IconBox(
+                            icon = Icons.Outlined.Psychology,
+                            color = sectionColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "自定义 AI 解析提示词",
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = "修改提示词可以影响 AI 如何理解你的任务描述",
+                                fontSize = 13.sp,
+                                color = SmartColors.textTertiary()
+                            )
+                        }
+                    }
                 }
             }
 
+            // Section: System Prompt
             item {
-                Text(
-                    text = "系统提示词",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.EditNote,
+                    title = "系统提示词",
+                    color = sectionColor
                 )
             }
 
@@ -99,14 +114,13 @@ fun PromptSettingsScreen(settingsRepo: SettingsRepository, onBack: () -> Unit) {
                         shape = RoundedCornerShape(16),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SmartColors.accent(),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            unfocusedBorderColor = SmartColors.borderSubtle()
                         )
                     )
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -133,13 +147,12 @@ fun PromptSettingsScreen(settingsRepo: SettingsRepository, onBack: () -> Unit) {
                 }
             }
 
+            // Section: Variables
             item {
-                Text(
-                    text = "变量说明",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.DataObject,
+                    title = "变量说明",
+                    color = Color(0xFF06B6D4)
                 )
             }
 
@@ -147,14 +160,36 @@ fun PromptSettingsScreen(settingsRepo: SettingsRepository, onBack: () -> Unit) {
                 SmartCard {
                     Text(
                         text = "在提示词中可以使用以下变量：",
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        color = SmartColors.textSecondary()
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     variablePairs.forEach { (name, desc) ->
                         Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8))
+                                .border(
+                                    width = 1.dp,
+                                    color = SmartColors.accent().copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(8)
+                                )
+                                .background(
+                                    SmartColors.accent().copy(alpha = 0.04f),
+                                    RoundedCornerShape(8)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            // Accent-colored left border indicator via a small box
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(2))
+                                    .background(SmartColors.accent())
+                            )
                             Surface(
                                 shape = RoundedCornerShape(6),
                                 color = SmartColors.accent().copy(alpha = 0.12f)
@@ -163,18 +198,24 @@ fun PromptSettingsScreen(settingsRepo: SettingsRepository, onBack: () -> Unit) {
                                     text = name,
                                     fontSize = 12.sp,
                                     color = SmartColors.accent(),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                             Text(
                                 text = desc,
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = SmartColors.textSecondary()
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
+            }
+
+            // Bottom spacer
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

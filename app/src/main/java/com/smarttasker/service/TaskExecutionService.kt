@@ -12,6 +12,7 @@ import com.smarttasker.data.entity.RouteStepEntity
 import com.smarttasker.data.entity.RunRecordEntity
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.data.repository.RunRepository
+import com.smarttasker.data.repository.TaskRepository
 import com.smarttasker.util.DebugLog
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -24,6 +25,7 @@ class TaskExecutionService(
     private val context: Context,
     private val routeRepository: RouteRepository,
     private val runRepository: RunRepository,
+    private val taskRepository: TaskRepository,
     private val screenshotManager: ScreenshotManager? = null
 ) {
     private val manager = CoreBridgeManager.getInstance(context)
@@ -91,8 +93,6 @@ class TaskExecutionService(
 
             result = when (finalStatus.state) {
                 "success" -> {
-                    _executionState.value = ExecutionState.Completed(taskId)
- 
                     // 任务成功后截图验证
                     val screenshotPath = screenshotManager?.let { manager ->
                         when (val result = manager.captureScreen("task_${taskId}")) {
@@ -112,6 +112,41 @@ class TaskExecutionService(
                     val trace = collectTrace(taskId)
                     val parsedRoute = route?.let { RouteAdapter.parseRoute(it, taskId) }
                     val steps = parsedRoute?.steps ?: emptyList()
+
+                    // ===== 自动保存路线逻辑 =====
+                    var autoSavedRouteId: String? = null
+                    if (route != null && steps.isNotEmpty()) {
+                        try {
+                            autoSavedRouteId = routeRepository.saveFromTrialSteps(taskId, steps)
+                            DebugLog.i("TaskExec", "路线自动保存成功, routeId=$autoSavedRouteId, steps=${steps.size}")
+                        } catch (e: Exception) {
+                            DebugLog.e("TaskExec", "路线自动保存失败: ${e.message}")
+                        }
+                    }
+
+                    // ===== 自动激活任务 =====
+                    if (autoSavedRouteId != null) {
+                        try {
+                            val task = taskRepository.getTaskById(taskId)
+                            if (task != null) {
+                                taskRepository.activateTask(task)
+                                DebugLog.i("TaskExec", "任务已自动激活, taskId=$taskId")
+                            }
+                        } catch (e: Exception) {
+                            DebugLog.e("TaskExec", "任务自动激活失败: ${e.message}")
+                        }
+                    }
+
+                    // 更新状态为 AutoSaved 或 Completed
+                    if (autoSavedRouteId != null) {
+                        _executionState.value = ExecutionState.AutoSaved(
+                            taskId = taskId,
+                            routeId = autoSavedRouteId,
+                            stepCount = steps.size
+                        )
+                    } else {
+                        _executionState.value = ExecutionState.Completed(taskId)
+                    }
 
                     DebugLog.i("TaskExec", "任务成功完成, 总重试次数=$totalRetryCount")
                     val runRecord = RunRecordEntity(
@@ -290,6 +325,8 @@ class TaskExecutionService(
     
     private suspend fun pollUntilDone(taskId: String): Pair<TaskStatusResult.Status, Int> {
         var pollRetryCount = 0
+        var stepCount = 0
+        var currentStepSummary = ""
         val status = withTimeoutOrNull(120_000L) { // 2 min timeout
             while (true) {
                 val retryResult = pollRetryExecutor.executeCatching(
@@ -312,10 +349,18 @@ class TaskExecutionService(
 
                 when (val result = retryResult.getOrThrow()) {
                     is TaskStatusResult.Status -> {
+                        // 更新步骤计数和摘要
+                        if (result.phase != _executionState.value.let { (it as? ExecutionState.Running)?.phase ?: "" }) {
+                            stepCount++
+                        }
+                        currentStepSummary = result.aiThinking.take(80)
                         _executionState.value = ExecutionState.Running(
                             taskId = taskId,
                             phase = result.phase,
-                            progress = estimateProgress(result.phase)
+                            progress = estimateProgress(result.phase),
+                            aiThinking = result.aiThinking,
+                            stepCount = stepCount,
+                            currentStepSummary = currentStepSummary
                         )
                         if (result.state in listOf("success", "failed", "cancelled")) {
                             return@withTimeoutOrNull result
@@ -411,8 +456,20 @@ class TaskExecutionService(
 sealed class ExecutionState {
     object Idle : ExecutionState()
     object Submitting : ExecutionState()
-    data class Running(val taskId: String, val phase: String, val progress: Float) : ExecutionState()
+    data class Running(
+        val taskId: String,
+        val phase: String,
+        val progress: Float,
+        val aiThinking: String = "",  // AI's observing/thinking/action for UI display
+        val stepCount: Int = 0,       // 当前已执行步骤数
+        val currentStepSummary: String = ""  // 当前步骤摘要
+    ) : ExecutionState()
     data class Completed(val taskId: String) : ExecutionState()
+    data class AutoSaved(
+        val taskId: String,
+        val routeId: String,
+        val stepCount: Int
+    ) : ExecutionState()
     data class Error(val message: String) : ExecutionState()
 }
 

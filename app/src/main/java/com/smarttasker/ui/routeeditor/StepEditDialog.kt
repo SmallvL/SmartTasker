@@ -5,13 +5,15 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,14 +21,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.data.entity.RouteStepEntity
-import com.smarttasker.ui.theme.*
+import com.smarttasker.ui.theme.SmartColors
+
+// ── Step type color mapping for dialog ──
+private val DialogStepTypeColors = mapOf(
+    "tap"       to Color(0xFF3B82F6),
+    "input"     to Color(0xFF8B5CF6),
+    "swipe"     to Color(0xFFF97316),
+    "wait"      to Color(0xFF9CA3AF),
+    "back"      to Color(0xFFEF4444),
+    "home"      to Color(0xFF22C55E),
+    "open_app"  to Color(0xFF06B6D4),
+    "assert"    to Color(0xFF10B981),
+    "confirm"   to Color(0xFFEAB308),
+    "finish"    to Color(0xFFEF4444)
+)
 
 /**
- * 步骤编辑对话框（使用 Box 覆盖层，不创建独立 window）
+ * 步骤编辑对话框 — Precision Instrument aesthetic
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -44,66 +61,95 @@ fun StepEditDialog(
     var maxRetries by remember { mutableStateOf(step.maxRetries.toString()) }
     var requiresConfirmation by remember { mutableStateOf(step.requiresConfirmation) }
 
-    // 使用 Box 覆盖层而非 AlertDialog，确保 BackHandler 能正确拦截返回键
+    val currentStepColor = DialogStepTypeColors[selectedType] ?: SmartColors.accent()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.5f))
             .clickable(
                 indication = null,
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                interactionSource = remember { MutableInteractionSource() }
             ) { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(LinearBgSurface)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(
                     indication = null,
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    interactionSource = remember { MutableInteractionSource() }
                 ) { /* 阻止点击穿透 */ }
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 标题
-            Text(
-                text = "编辑步骤 ${stepIndex + 1}",
-                color = LinearTextPrimary,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp
-            )
+            // ── Header ──
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = currentStepColor.copy(alpha = 0.12f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Edit,
+                            contentDescription = null,
+                            tint = currentStepColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Column {
+                    Text(
+                        text = "编辑步骤",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        text = "#${stepIndex + 1}",
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = SmartColors.textTertiary()
+                    )
+                }
+            }
 
-            // 步骤类型选择
-            SectionHeader(title = "步骤类型", icon = Icons.Default.Category)
+            Divider(color = SmartColors.borderSubtle())
+
+            // ── 步骤类型 ──
+            DialogSectionHeader(title = "步骤类型", icon = Icons.Outlined.Category)
 
             StepTypeSelector(
                 selectedType = selectedType,
                 onTypeSelected = { selectedType = it }
             )
 
-            // 步骤摘要
-            SectionHeader(title = "步骤描述", icon = Icons.Default.Description)
+            // ── 步骤描述 ──
+            DialogSectionHeader(title = "步骤描述", icon = Icons.Outlined.Description)
 
             OutlinedTextField(
                 value = summary,
                 onValueChange = { summary = it },
-                placeholder = { Text("输入步骤描述", color = LinearTextTertiary) },
+                placeholder = { Text("输入步骤描述", color = SmartColors.textTertiary()) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = LinearTextPrimary,
-                    unfocusedTextColor = LinearTextPrimary,
-                    focusedBorderColor = LinearBrandIndigo,
-                    unfocusedBorderColor = LinearBorderDefault,
-                    cursorColor = LinearBrandIndigo
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedBorderColor = SmartColors.accent(),
+                    unfocusedBorderColor = SmartColors.borderSubtle(),
+                    cursorColor = SmartColors.accent()
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
 
-            // 定位策略
-            SectionHeader(title = "定位策略", icon = Icons.Default.MyLocation)
+            // ── 定位策略 ──
+            DialogSectionHeader(title = "定位策略", icon = Icons.Outlined.MyLocation)
 
             LocatorStrategySelector(
                 selectedStrategy = locatorStrategy,
@@ -114,107 +160,116 @@ fun StepEditDialog(
             OutlinedTextField(
                 value = locatorValue,
                 onValueChange = { locatorValue = it },
-                placeholder = { Text("输入定位值", color = LinearTextTertiary) },
+                placeholder = { Text("输入定位值", color = SmartColors.textTertiary()) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = LinearTextPrimary,
-                    unfocusedTextColor = LinearTextPrimary,
-                    focusedBorderColor = LinearBrandIndigo,
-                    unfocusedBorderColor = LinearBorderDefault,
-                    cursorColor = LinearBrandIndigo
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedBorderColor = SmartColors.accent(),
+                    unfocusedBorderColor = SmartColors.borderSubtle(),
+                    cursorColor = SmartColors.accent()
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
 
-            // 高级设置
-            SectionHeader(title = "高级设置", icon = Icons.Default.Tune)
+            // ── 高级设置 ──
+            DialogSectionHeader(title = "高级设置", icon = Icons.Outlined.Tune)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 等待时间
                 OutlinedTextField(
                     value = waitTimeMs,
                     onValueChange = { waitTimeMs = it },
                     label = { Text("等待时间", fontSize = 12.sp) },
-                    suffix = { Text("ms", fontSize = 12.sp, color = LinearTextTertiary) },
+                    suffix = {
+                        Text(
+                            "ms",
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = SmartColors.textTertiary()
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = LinearTextPrimary,
-                        unfocusedTextColor = LinearTextPrimary,
-                        focusedBorderColor = LinearBrandIndigo,
-                        unfocusedBorderColor = LinearBorderDefault,
-                        cursorColor = LinearBrandIndigo
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = SmartColors.accent(),
+                        unfocusedBorderColor = SmartColors.borderSubtle(),
+                        cursorColor = SmartColors.accent()
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // 重试次数
                 OutlinedTextField(
                     value = maxRetries,
                     onValueChange = { maxRetries = it },
                     label = { Text("重试次数", fontSize = 12.sp) },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = LinearTextPrimary,
-                        unfocusedTextColor = LinearTextPrimary,
-                        focusedBorderColor = LinearBrandIndigo,
-                        unfocusedBorderColor = LinearBorderDefault,
-                        cursorColor = LinearBrandIndigo
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = SmartColors.accent(),
+                        unfocusedBorderColor = SmartColors.borderSubtle(),
+                        cursorColor = SmartColors.accent()
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
             }
 
             // 需要确认开关
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LinearBgPanel)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SmartColors.borderSubtle())
             ) {
-                Column {
-                    Text(
-                        text = "执行前确认",
-                        color = LinearTextPrimary,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "执行此步骤前需要用户确认",
-                        color = LinearTextTertiary,
-                        fontSize = 12.sp
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "执行前确认",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "执行此步骤前需要用户确认",
+                            color = SmartColors.textTertiary(),
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Switch(
+                        checked = requiresConfirmation,
+                        onCheckedChange = { requiresConfirmation = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = SmartColors.accent(),
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = SmartColors.textTertiary().copy(alpha = 0.3f)
+                        )
                     )
                 }
-
-                Switch(
-                    checked = requiresConfirmation,
-                    onCheckedChange = { requiresConfirmation = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = LinearBrandIndigo,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = LinearTextTertiary.copy(alpha = 0.3f)
-                    )
-                )
             }
 
-            // 按钮行
+            // ── 按钮行 ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = "取消",
-                        color = LinearTextTertiary
-                    )
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("取消")
                 }
-                TextButton(
+                Button(
                     onClick = {
                         val updatedStep = step.copy(
                             type = selectedType,
@@ -226,13 +281,14 @@ fun StepEditDialog(
                             requiresConfirmation = requiresConfirmation
                         )
                         onSave(updatedStep)
-                    }
-                ) {
-                    Text(
-                        text = "保存",
-                        color = LinearBrandIndigo,
-                        fontWeight = FontWeight.Medium
+                    },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SmartColors.accent()
                     )
+                ) {
+                    Text("保存", fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -243,7 +299,7 @@ fun StepEditDialog(
  * 章节标题
  */
 @Composable
-private fun SectionHeader(
+private fun DialogSectionHeader(
     title: String,
     icon: ImageVector
 ) {
@@ -251,17 +307,25 @@ private fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = LinearBrandIndigo,
-            modifier = Modifier.size(18.dp)
-        )
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = SmartColors.accent().copy(alpha = 0.1f),
+            modifier = Modifier.size(24.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = SmartColors.accent(),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
         Text(
             text = title,
-            color = LinearTextPrimary,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp
+            fontSize = 14.sp,
+            color = SmartColors.textSecondary()
         )
     }
 }
@@ -286,7 +350,7 @@ private fun StepTypeSelector(
         "confirm" to "确认",
         "finish" to "完成"
     )
-    
+
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -294,32 +358,44 @@ private fun StepTypeSelector(
     ) {
         types.forEach { (type, name) ->
             val isSelected = selectedType == type
+            val typeColor = DialogStepTypeColors[type] ?: SmartColors.accent()
             val animatedColor by animateColorAsState(
-                targetValue = if (isSelected) LinearBrandIndigo else LinearBgPanel,
+                targetValue = if (isSelected) typeColor else MaterialTheme.colorScheme.surfaceVariant,
                 animationSpec = tween(durationMillis = 200),
                 label = "chipColor"
             )
-            
-            Box(
+
+            Surface(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(animatedColor)
-                    .then(
-                        if (isSelected) Modifier.border(
-                            width = 1.dp,
-                            color = LinearBrandIndigo.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(10.dp)
-                        ) else Modifier
-                    )
-                    .clickable { onTypeSelected(type) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = name,
-                    color = if (isSelected) Color.White else LinearTextPrimary,
-                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                    fontSize = 14.sp
+                    .clickable { onTypeSelected(type) },
+                shape = RoundedCornerShape(10.dp),
+                color = animatedColor.copy(alpha = if (isSelected) 0.15f else 1f),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = if (isSelected) 1.5.dp else 1.dp,
+                    color = if (isSelected) typeColor else SmartColors.borderSubtle()
                 )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = typeColor
+                        )
+                    }
+                    Text(
+                        text = name,
+                        color = if (isSelected) typeColor else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                        fontSize = 13.sp
+                    )
+                }
             }
         }
     }
@@ -341,7 +417,7 @@ private fun LocatorStrategySelector(
         "coordinate" to "坐标",
         "visual_description" to "视觉描述"
     )
-    
+
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -350,30 +426,28 @@ private fun LocatorStrategySelector(
         strategies.forEach { (strategy, name) ->
             val isSelected = selectedStrategy == strategy
             val animatedColor by animateColorAsState(
-                targetValue = if (isSelected) LinearBrandIndigo else LinearBgPanel,
+                targetValue = if (isSelected) SmartColors.accent() else MaterialTheme.colorScheme.surfaceVariant,
                 animationSpec = tween(durationMillis = 200),
                 label = "chipColor"
             )
-            
-            Box(
+
+            Surface(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(animatedColor)
-                    .then(
-                        if (isSelected) Modifier.border(
-                            width = 1.dp,
-                            color = LinearBrandIndigo.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(10.dp)
-                        ) else Modifier
-                    )
-                    .clickable { onStrategySelected(strategy) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .clickable { onStrategySelected(strategy) },
+                shape = RoundedCornerShape(10.dp),
+                color = animatedColor.copy(alpha = if (isSelected) 0.15f else 1f),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = if (isSelected) 1.5.dp else 1.dp,
+                    color = if (isSelected) SmartColors.accent() else SmartColors.borderSubtle()
+                )
             ) {
                 Text(
                     text = name,
-                    color = if (isSelected) Color.White else LinearTextPrimary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    color = if (isSelected) SmartColors.accent() else MaterialTheme.colorScheme.onSurface,
                     fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                    fontSize = 14.sp
+                    fontSize = 13.sp
                 )
             }
         }

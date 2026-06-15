@@ -168,6 +168,8 @@ class CoreBridgeManager private constructor(private val context: Context) {
             )
             _llmConfigured.value = true
             DebugLog.i("CoreMgr", "LLM configured: model=$model url=$baseUrl")
+            // Also configure the DirectCoreBridge for AI vision loop
+            (_bridge as? DirectCoreBridge)?.configureLlm(apiKey, baseUrl, model)
         } else {
             _llmConfigured.value = false
         }
@@ -216,6 +218,7 @@ class CoreBridgeManager private constructor(private val context: Context) {
                 _shellMode.value = ShellExecutor.detectMode()
             }
 
+            val previousStatus = _coreStatus.value
             when (val result = bridge.getCoreStatus()) {
                 is CoreStatusResult.Running -> {
                     _coreStatus.value = CoreStatus.Running(
@@ -233,8 +236,16 @@ class CoreBridgeManager private constructor(private val context: Context) {
                     _coreStatus.value = CoreStatus.Error(result.message)
                 }
             }
+            // Only log when status actually changes
+            if (_coreStatus.value != previousStatus) {
+                DebugLog.i("CoreMgr", "Status changed: $previousStatus -> ${_coreStatus.value}")
+            }
         } catch (e: Exception) {
+            val previousStatus = _coreStatus.value
             _coreStatus.value = CoreStatus.Error(e.message ?: "连接失败")
+            if (_coreStatus.value != previousStatus) {
+                DebugLog.e("CoreMgr", "Status error: ${e.message}")
+            }
         } finally {
             _isChecking.value = false
         }

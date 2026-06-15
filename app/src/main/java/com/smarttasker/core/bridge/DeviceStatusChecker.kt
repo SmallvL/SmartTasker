@@ -42,6 +42,7 @@ class DeviceStatusChecker(private val context: Context) {
      * Run all checks and update state.
      */
     suspend fun checkAll() = withContext(Dispatchers.IO) {
+        val previous = _status.value
         _status.value = _status.value.copy(isChecking = true)
 
         val devOptions = isDeveloperOptionsEnabled()
@@ -86,7 +87,21 @@ class DeviceStatusChecker(private val context: Context) {
             isChecking = false
         )
         _status.value = result
-        DebugLog.i("Status", "Check complete: dev=$devOptions wireless=$wirelessDebug endpoint=$hasEndpoint($endpoint) portReach=$portReachable adb=$adbConnected root=$rootAvail mode=$mode")
+        // Only log when key status fields actually change (ignore lastCheckTime/isChecking)
+        val statusChanged = result.activeMode != previous.activeMode ||
+            result.adbConnected != previous.adbConnected ||
+            result.rootAvailable != previous.rootAvailable ||
+            result.shellAvailable != previous.shellAvailable ||
+            result.adbPortReachable != previous.adbPortReachable ||
+            result.coreRunning != previous.coreRunning ||
+            result.canRecord != previous.canRecord ||
+            result.canExecute != previous.canExecute ||
+            result.developerOptionsOn != previous.developerOptionsOn ||
+            result.wirelessDebuggingOn != previous.wirelessDebuggingOn ||
+            result.hasSavedEndpoint != previous.hasSavedEndpoint
+        if (statusChanged) {
+            DebugLog.i("Status", "Status changed: mode=${result.activeMode} adb=${result.adbConnected} root=${result.rootAvailable} (was: mode=${previous.activeMode} adb=${previous.adbConnected} root=${previous.rootAvailable})")
+        }
         result
     }
 

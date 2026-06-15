@@ -138,7 +138,7 @@ fun CoreControlScreen(
                     Icon(Icons.Outlined.Refresh, contentDescription = "刷新")
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
         )
 
         Column(

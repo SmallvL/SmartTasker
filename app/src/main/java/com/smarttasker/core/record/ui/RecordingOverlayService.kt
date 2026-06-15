@@ -35,6 +35,10 @@ class RecordingOverlayService : Service() {
         const val ACTION_RECORD_START_FAILED = "com.smarttasker.action.RECORD_START_FAILED"
         const val EXTRA_FAIL_REASON = "fail_reason"
 
+        /** Intent extra: target app package name to auto-launch after recording starts */
+        const val EXTRA_TARGET_PACKAGE = "target_package"
+        const val EXTRA_TARGET_APP_NAME = "target_app_name"
+
         private const val CHANNEL_ID = "smarttasker_recording"
         private const val NOTIFICATION_ID = 1004
     }
@@ -45,6 +49,7 @@ class RecordingOverlayService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var timerJob: Job? = null
     private var startTime = 0L
+    private var targetPackage: String? = null
 
     // UI elements
     private var statusText: TextView? = null
@@ -59,7 +64,10 @@ class RecordingOverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startRecording()
+            ACTION_START -> {
+                targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
+                startRecording()
+            }
             ACTION_STOP -> stopRecording()
             ACTION_PAUSE -> pauseRecording()
             ACTION_RESUME -> resumeRecording()
@@ -120,6 +128,8 @@ class RecordingOverlayService : Service() {
                 startTime = System.currentTimeMillis()
                 showOverlay()
                 startTimer()
+                // BUG1 fix: Auto-launch target app after recording starts
+                launchTargetApp()
                 DebugLog.i("RecOverlay", "Recording started via overlay")
             } else {
                 val error = sessionManager?.errorMessage?.value ?: "Unknown error"
@@ -178,6 +188,42 @@ class RecordingOverlayService : Service() {
         }
     }
 
+    /**
+     * Auto-launch the target app after recording starts.
+     * If targetPackage is empty, try to resolve from the task's targetAppName.
+     */
+    private fun launchTargetApp() {
+        val pkg = targetPackage
+        if (pkg.isNullOrEmpty()) {
+            DebugLog.i("RecOverlay", "No target package specified, skipping auto-launch")
+            return
+        }
+        // Delay slightly to let recording stabilize before switching apps
+        scope.launch {
+            delay(500)
+            try {
+                val launchIntent = packageManager.getLaunchIntentForPackage(pkg)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                    startActivity(launchIntent)
+                    DebugLog.i("RecOverlay", "Auto-launched target app: $pkg")
+                } else {
+                    // Fallback: try monkey command to launch the app
+                    DebugLog.w("RecOverlay", "No launch intent for $pkg, trying monkey command")
+                    try {
+                        val cmd = "monkey -p $pkg -c android.intent.category.LAUNCHER 1"
+                        Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+                        DebugLog.i("RecOverlay", "Launched via monkey: $pkg")
+                    } catch (e: Exception) {
+                        DebugLog.e("RecOverlay", "Monkey launch also failed: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                DebugLog.e("RecOverlay", "Failed to launch target app: ${e.message}")
+            }
+        }
+    }
+
     private fun showOverlay() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
@@ -206,25 +252,42 @@ class RecordingOverlayService : Service() {
             y = 100
         }
 
-        // Make draggable
+        // Make draggable — but only when dragging, not when clicking buttons
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
-        overlayView?.setOnTouchListener { _, event ->
+        var isDragging = false
+        val dragThreshold = 10 // pixels — only start dragging after this much movement
+        overlayView?.setOnTouchListener { v, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
-                    true
+                    isDragging = false
+                    false // Don't consume — let child views (buttons) receive the event
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager?.updateViewLayout(overlayView, params)
-                    true
+                    val dx = (event.rawX - initialTouchX).toInt()
+                    val dy = (event.rawY - initialTouchY).toInt()
+                    if (!isDragging && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+                        isDragging = true
+                    }
+                    if (isDragging) {
+                        params.x = initialX + dx
+                        params.y = initialY + dy
+                        windowManager?.updateViewLayout(overlayView, params)
+                    }
+                    isDragging
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (isDragging) {
+                        true // Consumed by drag
+                    } else {
+                        false // Not a drag — let child views handle the click
+                    }
                 }
                 else -> false
             }

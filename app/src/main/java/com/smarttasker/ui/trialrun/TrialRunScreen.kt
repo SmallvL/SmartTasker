@@ -38,7 +38,7 @@ data class TrialStep(
 fun TrialRunScreen(
     task: TaskEntity,
     executionService: TaskExecutionService,
-    onComplete: (List<TrialStep>) -> Unit,
+    onComplete: (List<TrialStep>, ExecutionResult.Success?) -> Unit,
     onCancel: () -> Unit
 ) {
     val executionState by executionService.executionState.collectAsState()
@@ -75,7 +75,7 @@ fun TrialRunScreen(
                 steps = steps.mapIndexed { i, step ->
                     when {
                         i < progressStep -> step.copy(status = TrialStepStatus.SUCCESS)
-                        i == progressStep -> step.copy(status = TrialStepStatus.RUNNING)
+                        i == progressStep -> step.copy(status = TrialStepStatus.RUNNING, detail = state.aiThinking.take(100))
                         else -> step.copy(status = TrialStepStatus.PENDING)
                     }
                 }
@@ -83,6 +83,11 @@ fun TrialRunScreen(
             is ExecutionState.Completed -> {
                 isRunning = false
                 statusText = "任务学习完成！"
+                steps = steps.map { it.copy(status = TrialStepStatus.SUCCESS) }
+            }
+            is ExecutionState.AutoSaved -> {
+                isRunning = false
+                statusText = "路线已自动保存（${state.stepCount}步）"
                 steps = steps.map { it.copy(status = TrialStepStatus.SUCCESS) }
             }
             is ExecutionState.Error -> {
@@ -274,6 +279,39 @@ fun TrialRunScreen(
                 }
             }
 
+            // AI thinking process card
+            val runningState = executionState as? ExecutionState.Running
+            if (runningState != null && runningState.aiThinking.isNotBlank()) {
+                item {
+                    SmartCard {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Psychology,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = SmartColors.accent()
+                            )
+                            Text(
+                                "AI 思考过程",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = SmartColors.accent()
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            runningState.aiThinking,
+                            fontSize = 13.sp,
+                            color = SmartColors.textSecondary(),
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+
             // Steps timeline
             item {
                 Text("执行步骤", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
@@ -332,7 +370,7 @@ fun TrialRunScreen(
                     Spacer(Modifier.height(8.dp))
                     SmartButton(
                         text = "查看学习结果",
-                        onClick = { onComplete(steps) },
+                        onClick = { onComplete(steps, executionResult as? ExecutionResult.Success) },
                         icon = Icons.Outlined.ArrowForward
                     )
                 }

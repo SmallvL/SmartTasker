@@ -12,6 +12,7 @@ import com.smarttasker.R
 import com.smarttasker.data.database.AppDatabase
 import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.data.repository.RunRepository
+import com.smarttasker.data.repository.TaskRepository
 import com.smarttasker.schedule.AlarmScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +63,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     if (steps.isNotEmpty()) {
                         val routeRepo = RouteRepository(routeDao)
                         val runRepo = RunRepository(runRecordDao)
-                        val executionService = TaskExecutionService(context, routeRepo, runRepo)
+                        val taskRepo = TaskRepository(taskDao)
+                        val executionService = TaskExecutionService(context, routeRepo, runRepo, taskRepo)
 
                         Log.i(TAG, "Executing scheduled task '$taskName' ($taskId), route=$effectiveRouteId")
                         val result = executionService.executeSavedRoute(taskId, steps)

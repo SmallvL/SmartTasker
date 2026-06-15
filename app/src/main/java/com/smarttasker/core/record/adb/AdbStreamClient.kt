@@ -179,7 +179,25 @@ class AdbStreamClient(private val adbExecutor: AdbShellExecutor? = null) {
         val output = execOutput("wm size") ?: return@withContext null
         val regex = Regex("(\\d+)x(\\d+)")
         val match = regex.find(output) ?: return@withContext null
-        Pair(match.groupValues[1].toInt(), match.groupValues[2].toInt())
+        var width = match.groupValues[1].toInt()
+        var height = match.groupValues[2].toInt()
+
+        // Check rotation using ContentResolver (no pipe needed)
+        val rotationOutput = execOutput("content query --uri content://settings/system --where \"name='accelerometer_rotation'\"")
+        // Also try settings get
+        val rotationValue = execOutput("settings get system user_rotation")
+        val rotation = rotationValue?.trim()?.toIntOrNull() ?: 0
+        // rotation: 0=portrait, 1=landscape (90°), 2=reverse portrait, 3=reverse landscape
+        if (rotation == 1 || rotation == 3) {
+            // Landscape: swap so width > height
+            if (width < height) {
+                val tmp = width
+                width = height
+                height = tmp
+            }
+        }
+        DebugLog.i("AdbStream", "Screen size: ${width}x${height}, rotation=$rotation, rawOutput=$rotationValue")
+        Pair(width, height)
     }
 
     suspend fun getDensity(): Int? = withContext(Dispatchers.IO) {

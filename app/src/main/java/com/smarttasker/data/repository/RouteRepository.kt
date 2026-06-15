@@ -101,6 +101,81 @@ class RouteRepository(private val dao: RouteDao) {
         return routeId
     }
 
+    /**
+     * Save trial steps from actual execution results (RouteStepEntity list).
+     * These steps already have proper type, locator, and coordinates.
+     */
+    suspend fun saveFromTrialSteps(
+        taskId: String,
+        executedSteps: List<RouteStepEntity>
+    ): String {
+        val routeId = UUID.randomUUID().toString().take(8)
+
+        val routeVersion = RouteVersionEntity(
+            routeId = routeId,
+            taskId = taskId,
+            version = "1.0.0",
+            status = "draft",
+            source = "ai_executed"
+        )
+        dao.insertRouteVersion(routeVersion)
+
+        // Remap step IDs and routeId to the new route
+        val steps = executedSteps.mapIndexed { index, step ->
+            step.copy(
+                stepId = UUID.randomUUID().toString().take(8),
+                routeId = routeId,
+                stepIndex = index + 1
+            )
+        }
+        if (steps.isNotEmpty()) {
+            dao.insertSteps(steps)
+        }
+
+        return routeId
+    }
+
+    /**
+     * 从模板步骤创建路线，将 TemplateStepEntity 转换为 RouteStepEntity。
+     * @return routeId of the saved route
+     */
+    suspend fun saveFromTemplateSteps(
+        taskId: String,
+        templateSteps: List<com.smarttasker.data.entity.TemplateStepEntity>
+    ): String {
+        val routeId = UUID.randomUUID().toString().take(8)
+
+        val routeVersion = RouteVersionEntity(
+            routeId = routeId,
+            taskId = taskId,
+            version = "1.0.0",
+            status = "published",
+            source = "template"
+        )
+        dao.insertRouteVersion(routeVersion)
+
+        val steps = templateSteps.mapIndexed { index, tStep ->
+            RouteStepEntity(
+                stepId = UUID.randomUUID().toString().take(8),
+                routeId = routeId,
+                stepIndex = tStep.stepIndex,
+                enabled = tStep.enabled,
+                type = tStep.type,
+                summary = tStep.summary,
+                locatorStrategy = tStep.locatorStrategy,
+                locatorValue = tStep.locatorValue,
+                waitTimeMs = tStep.waitTimeMs,
+                riskLevel = tStep.riskLevel,
+                source = "template"
+            )
+        }
+        if (steps.isNotEmpty()) {
+            dao.insertSteps(steps)
+        }
+
+        return routeId
+    }
+
     suspend fun publishRoute(route: RouteVersionEntity) {
         dao.updateRouteVersion(route.copy(status = "published", publishedAt = System.currentTimeMillis()))
     }
@@ -168,6 +243,7 @@ class RouteRepository(private val dao: RouteDao) {
             stepIndex = index,
             type = info.type,
             summary = info.summary,
+            screenshotRef = step.beforeScreenshotRef ?: "",
             locatorStrategy = info.locatorStrategy,
             locatorValue = info.locatorValue,
             locatorConfidence = step.confidence,

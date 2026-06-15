@@ -4,19 +4,28 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.data.repository.SettingsRepository
+import com.smarttasker.ui.common.IconBox
+import com.smarttasker.ui.common.SectionHeaderWithIcon
+import com.smarttasker.ui.common.SettingsDivider
 import com.smarttasker.ui.common.SmartCard
 import com.smarttasker.ui.common.SmartButton
 import com.smarttasker.ui.theme.SmartColors
@@ -57,52 +66,70 @@ fun ImportExportScreen(
     val dbExists = dbPath?.exists() == true
     val dbSize = if (dbExists) dbPath.length() / 1024 else 0
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("导入导出", fontWeight = FontWeight.SemiBold) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回")
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-        )
-
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("导入导出", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Outlined.ArrowBack, contentDescription = "返回")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Explanation
+            // Header card with icon box
             item {
                 SmartCard {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Outlined.ImportExport, contentDescription = null,
-                            tint = SmartColors.accent(), modifier = Modifier.size(32.dp))
+                        IconBox(
+                            icon = Icons.Outlined.ImportExport,
+                            color = Color(0xFF06B6D4)
+                        )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("数据备份与恢复", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            Text("数据备份与恢复", fontWeight = FontWeight.Medium, fontSize = 15.sp)
                             Text("导出任务和配置，或从备份恢复", fontSize = 13.sp, color = SmartColors.textTertiary())
                         }
                     }
                 }
             }
 
-            // Export
+            // Section: Export
             item {
-                Text("导出", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.FileUpload,
+                    title = "导出",
+                    color = Color(0xFF10B981)
+                )
             }
+
             item {
                 SmartCard {
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(Icons.Outlined.FileUpload, contentDescription = null,
-                            tint = SmartColors.accent(), modifier = Modifier.size(22.dp))
+                        IconBox(
+                            icon = Icons.Outlined.FileUpload,
+                            color = Color(0xFF10B981)
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text("导出数据库", fontWeight = FontWeight.Medium, fontSize = 15.sp)
                             Text("将数据库文件复制到下载目录", fontSize = 13.sp, color = SmartColors.textTertiary())
@@ -146,19 +173,28 @@ fun ImportExportScreen(
                 }
             }
 
-            // Import
+            // Section: Import
             item {
-                Text("导入", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.FileDownload,
+                    title = "导入",
+                    color = Color(0xFF8B5CF6)
+                )
             }
+
             item {
                 SmartCard {
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(Icons.Outlined.FileDownload, contentDescription = null,
-                            tint = SmartColors.accent(), modifier = Modifier.size(22.dp))
+                        IconBox(
+                            icon = Icons.Outlined.FileDownload,
+                            color = Color(0xFF8B5CF6)
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text("从备份恢复", fontWeight = FontWeight.Medium, fontSize = 15.sp)
                             Text("将覆盖当前所有数据，请先备份", fontSize = 13.sp, color = SmartColors.warning())
@@ -209,31 +245,63 @@ fun ImportExportScreen(
                 }
             }
 
-            // Data stats
+            // Section: Data stats
             item {
-                Text("数据统计", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.Storage,
+                    title = "数据统计",
+                    color = Color(0xFF5B6EF5)
+                )
             }
+
             item {
                 SmartCard {
-                    InfoRow("数据库路径", dbPath?.absolutePath ?: "未知")
-                    Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("数据库大小", "${dbSize} KB")
-                    Divider(color = SmartColors.borderSubtle(), modifier = Modifier.padding(vertical = 8.dp))
-                    InfoRow("数据库状态", if (dbExists) "正常" else "未创建")
+                    InfoRowWithIcon(Icons.Outlined.Folder, "数据库路径", dbPath?.absolutePath ?: "未知", Color(0xFF5B6EF5))
+                    SettingsDivider()
+                    InfoRowWithIcon(Icons.Outlined.DataUsage, "数据库大小", "${dbSize} KB", Color(0xFF06B6D4))
+                    SettingsDivider()
+                    InfoRowWithIcon(
+                        Icons.Outlined.CheckCircle,
+                        "数据库状态",
+                        if (dbExists) "正常" else "未创建",
+                        if (dbExists) SmartColors.success() else SmartColors.danger()
+                    )
                 }
             }
 
-            // Danger zone
+            // Danger zone with red left border accent
             item {
                 Spacer(Modifier.height(8.dp))
                 SmartCard {
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12))
+                            .border(
+                                width = 1.dp,
+                                color = SmartColors.danger().copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(12)
+                            )
+                            .background(
+                                SmartColors.danger().copy(alpha = 0.04f),
+                                RoundedCornerShape(12)
+                            )
+                            .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(Icons.Outlined.Delete, contentDescription = null,
-                            tint = SmartColors.danger(), modifier = Modifier.size(22.dp))
+                        // Red left border accent
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(2))
+                                .background(SmartColors.danger())
+                        )
+                        IconBox(
+                            icon = Icons.Outlined.Delete,
+                            color = SmartColors.danger()
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text("清除所有设置", fontWeight = FontWeight.Medium, fontSize = 15.sp,
                                 color = SmartColors.danger())
@@ -242,12 +310,17 @@ fun ImportExportScreen(
                         }
                         OutlinedButton(
                             onClick = { showClearDialog = true },
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12)
+                            shape = RoundedCornerShape(12)
                         ) {
                             Text("清除", color = SmartColors.danger(), fontSize = 13.sp)
                         }
                     }
                 }
+            }
+
+            // Bottom spacer
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -326,10 +399,19 @@ fun ImportExportScreen(
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(label, color = SmartColors.textSecondary(), modifier = Modifier.weight(1f), fontSize = 14.sp)
-        Text(value, fontSize = 14.sp)
+private fun InfoRowWithIcon(icon: ImageVector, label: String, value: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        IconBox(icon = icon, color = color)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+            Text(value, fontSize = 13.sp, color = SmartColors.textTertiary())
+        }
     }
 }
 

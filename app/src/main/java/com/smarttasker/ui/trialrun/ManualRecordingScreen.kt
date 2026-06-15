@@ -268,6 +268,8 @@ fun ManualRecordingScreen(
                                     onClick = {
                                         val intent = Intent(context, RecordingOverlayService::class.java)
                                             .setAction(RecordingOverlayService.ACTION_START)
+                                            .putExtra(RecordingOverlayService.EXTRA_TARGET_PACKAGE, task.targetPackage)
+                                            .putExtra(RecordingOverlayService.EXTRA_TARGET_APP_NAME, task.targetAppName)
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                             context.startForegroundService(intent)
                                         } else {

@@ -2,6 +2,8 @@
 *.apk
 *.ap_
 *.aab
+# Except release APKs
+!SmartTasker-*.apk
 
 # Files for the ART/Dalvik VM
 *.dex

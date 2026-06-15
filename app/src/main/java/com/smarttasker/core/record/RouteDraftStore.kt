@@ -80,6 +80,8 @@ class RouteDraftStore(private val context: Context) {
         sb.append("\"delayFromPreviousMs\":${step.delayFromPreviousMs},")
         sb.append("\"confidence\":${step.confidence}")
         step.notes?.let { sb.append(",\"notes\":\"${esc(it)}\"") }
+        step.beforeScreenshotRef?.let { sb.append(",\"beforeScreenshotRef\":\"${esc(it)}\"") }
+        step.afterScreenshotRef?.let { sb.append(",\"afterScreenshotRef\":\"${esc(it)}\"") }
         // Action
         sb.append(",\"action\":${serializeAction(step.action)}")
         // Target
@@ -212,7 +214,9 @@ class RouteDraftStore(private val context: Context) {
             deviceContext = deviceCtx,
             target = target,
             confidence = getFloat(json, "confidence"),
-            notes = getString(json, "notes")
+            notes = getString(json, "notes"),
+            beforeScreenshotRef = getString(json, "beforeScreenshotRef"),
+            afterScreenshotRef = getString(json, "afterScreenshotRef")
         )
     }
 

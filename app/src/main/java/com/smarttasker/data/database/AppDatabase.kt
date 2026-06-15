@@ -17,9 +17,12 @@ import com.smarttasker.data.entity.*
         TraceEventEntity::class,
         SafetyDecisionEntity::class,
         ModelUsageEntity::class,
-        PermissionSnapshotEntity::class
+        PermissionSnapshotEntity::class,
+        TemplateEntity::class,
+        TemplateStepEntity::class,
+        TemplateVersionEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun safetyDecisionDao(): SafetyDecisionDao
     abstract fun modelUsageDao(): ModelUsageDao
     abstract fun permissionSnapshotDao(): PermissionSnapshotDao
+    abstract fun templateDao(): TemplateDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -73,6 +77,15 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE trace_events ADD COLUMN screenshotPath TEXT")
             }
         }
+
+        // Migration from v6 to v7: add template tables
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `templates` (`templateId` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `category` TEXT NOT NULL, `icon` TEXT NOT NULL, `version` TEXT NOT NULL, `versionCode` INTEGER NOT NULL, `sourceTaskId` TEXT NOT NULL, `sourceRouteId` TEXT NOT NULL, `stepCount` INTEGER NOT NULL, `avgDurationMs` INTEGER NOT NULL, `successRate` REAL NOT NULL, `usageCount` INTEGER NOT NULL, `isBuiltIn` INTEGER NOT NULL, `tags` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`templateId`))")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `template_steps` (`stepId` TEXT NOT NULL, `templateId` TEXT NOT NULL, `versionCode` INTEGER NOT NULL, `stepIndex` INTEGER NOT NULL, `enabled` INTEGER NOT NULL, `type` TEXT NOT NULL, `summary` TEXT NOT NULL, `locatorStrategy` TEXT NOT NULL, `locatorValue` TEXT NOT NULL, `waitTimeMs` INTEGER NOT NULL, `riskLevel` TEXT NOT NULL, `notes` TEXT NOT NULL, PRIMARY KEY(`stepId`))")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `template_versions` (`versionId` TEXT NOT NULL, `templateId` TEXT NOT NULL, `versionCode` INTEGER NOT NULL, `version` TEXT NOT NULL, `changeSummary` TEXT NOT NULL, `stepCount` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`versionId`))")
+            }
+        }
  
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -81,7 +94,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smarttask.db"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration() // Fallback for dev
                 .build().also { INSTANCE = it }
             }

@@ -28,6 +28,7 @@ class AccessibilityEventBuffer {
 
     fun add(event: AccessibilityEvent) {
         val node = event.source
+        val now = System.currentTimeMillis()
         val buffered = BufferedEvent(
             type = event.eventType,
             packageName = event.packageName?.toString(),
@@ -40,7 +41,8 @@ class AccessibilityEventBuffer {
             boundsRight = node?.getBoundsRight() ?: 0,
             boundsBottom = node?.getBoundsBottom() ?: 0,
             isClickable = node?.isClickable ?: false,
-            isEnabled = node?.isEnabled ?: false
+            isEnabled = node?.isEnabled ?: false,
+            timestamp = now
         )
         // Release the node to avoid leaks
         node?.recycle()
@@ -56,6 +58,58 @@ class AccessibilityEventBuffer {
         return events
             .filter { it.type == type && Math.abs(it.timestamp - time) <= toleranceMs }
             .minByOrNull { Math.abs(it.timestamp - time) }
+    }
+
+    /**
+     * Find the most recent click event within a time window.
+     * Unlike findNearestClick, this doesn't filter by coordinates.
+     */
+    fun findRecentClick(time: Long, toleranceMs: Long = 500): BufferedEvent? {
+        prune()
+        return events
+            .filter {
+                (it.type == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+                 it.type == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) &&
+                Math.abs(it.timestamp - time) <= toleranceMs
+            }
+            .maxByOrNull { it.timestamp }
+    }
+
+    /**
+     * Find the most recent event with meaningful (non-zero, non-fullscreen) bounds.
+     * Used for content change burst detection to infer tap location.
+     */
+    fun findRecentWithBounds(time: Long, toleranceMs: Long = 1000): BufferedEvent? {
+        prune()
+        return events
+            .filter {
+                Math.abs(it.timestamp - time) <= toleranceMs &&
+                (it.boundsRight - it.boundsLeft) > 0 &&
+                (it.boundsBottom - it.boundsTop) > 0
+            }
+            .maxByOrNull { it.timestamp }
+    }
+
+    /**
+     * Find the event with the smallest bounds area within a time window.
+     * Smaller bounds are more likely to represent the actual tapped element,
+     * rather than a large container view.
+     */
+    fun findSmallestRecentBounds(time: Long, toleranceMs: Long = 1500, maxArea: Long = 500000): BufferedEvent? {
+        prune()
+        return events
+            .filter {
+                Math.abs(it.timestamp - time) <= toleranceMs &&
+                (it.boundsRight - it.boundsLeft) > 0 &&
+                (it.boundsBottom - it.boundsTop) > 0 &&
+                // Exclude fullscreen or near-fullscreen bounds (area > maxArea)
+                ((it.boundsRight - it.boundsLeft).toLong() * (it.boundsBottom - it.boundsTop)) < maxArea
+            }
+            .minByOrNull {
+                val width = it.boundsRight - it.boundsLeft
+                val height = it.boundsBottom - it.boundsTop
+                width.toLong() * height
+            }
     }
 
     /**
@@ -76,13 +130,13 @@ class AccessibilityEventBuffer {
 
     /**
      * Find the nearest scroll event within a time window.
+     * Only matches TYPE_VIEW_SCROLLED — WINDOW_CONTENT_CHANGED is too noisy.
      */
     fun findNearestScroll(time: Long, toleranceMs: Long = 500): BufferedEvent? {
         prune()
         return events
             .filter {
-                (it.type == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
-                 it.type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) &&
+                it.type == AccessibilityEvent.TYPE_VIEW_SCROLLED &&
                 Math.abs(it.timestamp - time) <= toleranceMs
             }
             .minByOrNull { Math.abs(it.timestamp - time) }

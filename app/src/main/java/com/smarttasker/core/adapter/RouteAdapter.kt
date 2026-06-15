@@ -84,6 +84,18 @@ object RouteAdapter {
         return inner.split(",").mapNotNull { it.trim().toIntOrNull() }
     }
 
+    /**
+     * Extract the first string argument from a JSON array like ["some text"].
+     */
+    private fun extractStringArg(arrayStr: String?): String {
+        if (arrayStr == null) return ""
+        val inner = arrayStr.trim().removeSurrounding("[", "]").trim()
+        // Remove surrounding quotes and unescape
+        return inner.removeSurrounding("\"")
+            .replace("\\\"", "\"")
+            .replace("\\n", "\n")
+    }
+
     private fun escapeJson(s: String): String {
         return s.replace("\\", "\\\\").replace("\"", "\\\"")
             .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
@@ -132,7 +144,12 @@ object RouteAdapter {
 
         // Determine step type
         val type = when (op) {
-            "TAP" -> "tap"
+            "TAP" -> {
+                // If args contain a string (text to find), use tap_by_text
+                val args = extractJsonArray(stepJson, "args")
+                val hasStringArg = args != null && args.contains("\"")
+                if (hasStringArg && locatorStr == null) "tap_by_text" else "tap"
+            }
             "INPUT" -> "input"
             "SWIPE" -> "swipe"
             "BACK" -> "back"
@@ -141,7 +158,12 @@ object RouteAdapter {
             else -> op.lowercase()
         }
 
-        // Extract locator info
+        // Extract locator info (3-level: locator → containerProbe → fallback_point)
+        val containerProbeStr = extractJsonObject(stepJson, "container_probe")
+        // semanticNote and expectedNote available for future use (step description enrichment)
+        @Suppress("UNUSED_VARIABLE") val semanticNote = jsonStr(stepJson, "semantic_note")
+        @Suppress("UNUSED_VARIABLE") val expectedNote = jsonStr(stepJson, "expected")
+
         val locatorStrategy: String
         val locatorValue: String
         val fallbackStrategy: String
@@ -172,41 +194,89 @@ object RouteAdapter {
                 }
             }
 
-            // Fallback is coordinate
-            val fallbackStr = extractJsonArray(locatorStr, "fallback_point")
-            if (fallbackStr != null) {
-                val fp = jsonIntArray(fallbackStr)
-                if (fp.size >= 2) {
-                    fallbackStrategy = "coordinate"
-                    fallbackValue = "${fp[0]},${fp[1]}"
-                } else {
-                    fallbackStrategy = ""
-                    fallbackValue = ""
+            // Fallback: containerProbe → fallback_point → args
+            when {
+                containerProbeStr != null -> {
+                    // Level 2 fallback: containerProbe
+                    val cpText = jsonStr(containerProbeStr, "text")
+                    val cpResId = jsonStr(containerProbeStr, "resource_id")
+                    val cpDesc = jsonStr(containerProbeStr, "content_desc")
+                    fallbackStrategy = when {
+                        cpText.isNotEmpty() -> "text"
+                        cpResId.isNotEmpty() -> "resource_id"
+                        cpDesc.isNotEmpty() -> "content_desc"
+                        else -> "coordinate"
+                    }
+                    fallbackValue = when {
+                        cpText.isNotEmpty() -> cpText
+                        cpResId.isNotEmpty() -> cpResId
+                        cpDesc.isNotEmpty() -> cpDesc
+                        else -> {
+                            val fp = jsonIntArray(extractJsonArray(stepJson, "fallback_point") ?: "")
+                            if (fp.size >= 2) "${fp[0]},${fp[1]}" else ""
+                        }
+                    }
                 }
-            } else {
-                val args = jsonIntArray(argsStr)
-                if (args.size >= 2) {
-                    fallbackStrategy = "coordinate"
-                    fallbackValue = "${args[0]},${args[1]}"
-                } else {
-                    fallbackStrategy = ""
-                    fallbackValue = ""
+                else -> {
+                    // Level 3 fallback: fallback_point coordinates
+                    val stepFallbackStr = extractJsonArray(stepJson, "fallback_point")
+                    if (stepFallbackStr != null) {
+                        val fp = jsonIntArray(stepFallbackStr)
+                        if (fp.size >= 2) {
+                            fallbackStrategy = "coordinate"
+                            fallbackValue = "${fp[0]},${fp[1]}"
+                        } else {
+                            fallbackStrategy = ""
+                            fallbackValue = ""
+                        }
+                    } else {
+                        val args = jsonIntArray(argsStr)
+                        if (args.size >= 2) {
+                            fallbackStrategy = "coordinate"
+                            fallbackValue = "${args[0]},${args[1]}"
+                        } else {
+                            fallbackStrategy = ""
+                            fallbackValue = ""
+                        }
+                    }
                 }
             }
         } else {
-            // No locator - use coordinates only
-            locatorStrategy = "coordinate"
-            val args = jsonIntArray(argsStr)
-            locatorValue = if (args.size >= 2) "${args[0]},${args[1]}" else ""
-            fallbackStrategy = ""
-            fallbackValue = ""
+            // No locator - use coordinates or text based on type
+            if (type == "tap_by_text" || type == "input") {
+                // Extract string argument
+                val stringArg = extractStringArg(argsStr)
+                locatorStrategy = if (type == "tap_by_text") "text" else "coordinate"
+                locatorValue = stringArg
+                fallbackStrategy = ""
+                fallbackValue = ""
+            } else if (type == "open_app") {
+                // Package name from "package" field
+                locatorStrategy = "package"
+                locatorValue = jsonStr(stepJson, "package")
+                fallbackStrategy = ""
+                fallbackValue = ""
+            } else if (type == "wait") {
+                locatorStrategy = "duration"
+                val args = jsonIntArray(argsStr)
+                locatorValue = if (args.isNotEmpty()) "${args[0]}" else "1000"
+                fallbackStrategy = ""
+                fallbackValue = ""
+            } else {
+                locatorStrategy = "coordinate"
+                val args = jsonIntArray(argsStr)
+                locatorValue = if (args.size >= 2) "${args[0]},${args[1]}" else ""
+                fallbackStrategy = ""
+                fallbackValue = ""
+            }
         }
 
-        // Summary from semantic descriptor or generate
-        val summary = if (semanticStr != null) {
-            jsonStr(semanticStr, "instruction").ifEmpty { generateSummary(type, locatorValue) }
-        } else {
-            generateSummary(type, locatorValue)
+        // Summary: prefer explicit summary from JSON, then semantic descriptor, then generate
+        val jsonSummary = jsonStr(stepJson, "summary")
+        val summary = when {
+            jsonSummary.isNotEmpty() -> jsonSummary
+            semanticStr != null -> jsonStr(semanticStr, "instruction").ifEmpty { generateSummary(type, locatorValue) }
+            else -> generateSummary(type, locatorValue)
         }
 
         // Risk detection
@@ -231,11 +301,12 @@ object RouteAdapter {
     private fun generateSummary(type: String, value: String): String {
         return when (type) {
             "tap" -> if (value.isNotEmpty()) "点击 $value" else "点击"
+            "tap_by_text" -> if (value.isNotEmpty()) "点击「$value」" else "点击"
             "input" -> "输入 $value"
             "swipe" -> "滑动"
             "back" -> "返回"
             "wait" -> "等待页面加载"
-            "open_app" -> "打开应用"
+            "open_app" -> if (value.isNotEmpty()) "打开应用 $value" else "打开应用"
             else -> type
         }
     }
@@ -261,18 +332,49 @@ object RouteAdapter {
      */
     fun toRouteJson(steps: List<RouteStepEntity>): String {
         val sb = StringBuilder()
-        sb.append("{\"segments\":[")
+        sb.append("{\"segments\":[{\"steps\":[")
         steps.forEachIndexed { idx, step ->
             if (idx > 0) sb.append(",")
-            sb.append("{\"steps\":[{\"op\":\"")
-            sb.append(escapeJson(step.type.uppercase()))
-            sb.append("\",\"args\":[],\"locator\":{\"")
-            sb.append(escapeJson(step.locatorStrategy))
-            sb.append("\":\"")
-            sb.append(escapeJson(step.locatorValue))
-            sb.append("\"}}]}")
+            val op = when (step.type) {
+                "open_app" -> "LAUNCH"
+                "tap", "tap_by_text" -> "TAP"
+                "input" -> "INPUT"
+                "swipe", "swipe_down", "swipe_up" -> "SWIPE"
+                "back" -> "KEY"
+                "home" -> "KEY"
+                "wait" -> "WAIT"
+                else -> step.type.uppercase()
+            }
+            sb.append("{\"op\":\"$op\"")
+
+            // Add args based on type
+            when (step.type) {
+                "open_app" -> sb.append(",\"package\":\"${escapeJson(step.locatorValue)}\"")
+                "tap_by_text" -> sb.append(",\"args\":[\"${escapeJson(step.locatorValue)}\"]")
+                "tap" -> {
+                    val coords = step.locatorValue.split(",")
+                    if (coords.size >= 2) {
+                        sb.append(",\"args\":[${coords[0].trim()},${coords[1].trim()}]")
+                    }
+                }
+                "input" -> sb.append(",\"args\":[\"${escapeJson(step.locatorValue)}\"]")
+                "swipe_down" -> sb.append(",\"args\":[540,1600,540,600,500]")
+                "swipe_up" -> sb.append(",\"args\":[540,600,540,1600,500]")
+                "back" -> sb.append(",\"args\":[4]")
+                "home" -> sb.append(",\"args\":[3]")
+                "wait" -> sb.append(",\"args\":[${step.locatorValue.toLongOrNull() ?: 1000}]")
+                else -> sb.append(",\"args\":[]")
+            }
+
+            // Add locator for text-based taps
+            if (step.locatorStrategy in listOf("text", "resource_id", "content_desc")) {
+                sb.append(",\"locator\":{\"${step.locatorStrategy}\":\"${escapeJson(step.locatorValue)}\"}")
+            }
+
+            sb.append(",\"summary\":\"${escapeJson(step.summary)}\"")
+            sb.append("}")
         }
-        sb.append("]}")
+        sb.append("]}]}")
         return sb.toString()
     }
 }

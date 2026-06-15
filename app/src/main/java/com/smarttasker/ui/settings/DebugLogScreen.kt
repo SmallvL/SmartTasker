@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -112,7 +114,9 @@ fun DebugLogScreen(
                     Icon(Icons.Outlined.Delete, contentDescription = "清除")
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         )
 
         LazyColumn(
@@ -159,14 +163,43 @@ private fun CrashLogCard(msg: String, time: Long) {
         .format(java.util.Date(time))
     SmartCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Error, contentDescription = null,
-                    tint = SmartColors.danger(), modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("上次闪退日志 ($dateStr)", fontWeight = FontWeight.Bold,
-                    color = SmartColors.danger(), fontSize = 14.sp)
+            // macOS-style title bar dots
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Red dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF5F57))
+                    )
+                    // Yellow dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFBD2E))
+                    )
+                    // Green dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF28C840))
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Error, contentDescription = null,
+                        tint = SmartColors.danger(), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("上次闪退日志 ($dateStr)", fontWeight = FontWeight.Bold,
+                        color = SmartColors.danger(), fontSize = 13.sp)
+                }
             }
-            Spacer(Modifier.height(8.dp))
             Text(msg, fontSize = 12.sp, fontFamily = FontFamily.Monospace,
                 color = SmartColors.danger())
         }
@@ -177,14 +210,40 @@ private fun CrashLogCard(msg: String, time: Long) {
 private fun CrashTraceCard(trace: String) {
     SmartCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.BugReport, contentDescription = null,
-                    tint = SmartColors.warning(), modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("执行追踪日志", fontWeight = FontWeight.Bold,
-                    color = SmartColors.warning(), fontSize = 14.sp)
+            // macOS-style title bar dots
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF5F57))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFBD2E))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF28C840))
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.BugReport, contentDescription = null,
+                        tint = SmartColors.warning(), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("执行追踪日志", fontWeight = FontWeight.Bold,
+                        color = SmartColors.warning(), fontSize = 13.sp)
+                }
             }
-            Spacer(Modifier.height(8.dp))
             Text(trace, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
                 color = SmartColors.textSecondary(), maxLines = 50)
         }

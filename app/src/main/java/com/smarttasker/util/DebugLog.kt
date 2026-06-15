@@ -7,6 +7,10 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Global debug logger for SmartTasker.
  * UI can observe [logs] to display real-time debug output.
+ *
+ * Rate limiting: For DEBUG level, only the latest entry per tag within a 5-second
+ * window is kept in the log list. This prevents repetitive debug messages from
+ * growing the list unboundedly and triggering excessive UI recompositions.
  */
 object DebugLog {
 
@@ -28,6 +32,10 @@ object DebugLog {
 
     private const val MAX_LOGS = 500
 
+    // Rate limiting for DEBUG level: tag -> last entry timestamp
+    private val debugLastSeen = mutableMapOf<String, Long>()
+    private const val DEBUG_RATE_LIMIT_MS = 5000L  // 5-second window per tag
+
     fun d(tag: String, message: String) = add(LogEntry.Level.DEBUG, tag, message)
     fun i(tag: String, message: String) = add(LogEntry.Level.INFO, tag, message)
     fun w(tag: String, message: String) = add(LogEntry.Level.WARN, tag, message)
@@ -37,13 +45,34 @@ object DebugLog {
         val entry = LogEntry(tag = tag, message = message, level = level)
         synchronized(this) {
             val current = _logs.value.toMutableList()
-            current.add(entry)
+
+            if (level == LogEntry.Level.DEBUG) {
+                val now = entry.timestamp
+                val lastTime = debugLastSeen[tag]
+                if (lastTime != null && now - lastTime < DEBUG_RATE_LIMIT_MS) {
+                    // Within rate limit window: replace the previous DEBUG entry for this tag
+                    val lastIdx = current.indexOfLast { it.tag == tag && it.level == LogEntry.Level.DEBUG }
+                    if (lastIdx >= 0) {
+                        current[lastIdx] = entry
+                    } else {
+                        current.add(entry)
+                    }
+                } else {
+                    current.add(entry)
+                }
+                debugLastSeen[tag] = now
+            } else {
+                current.add(entry)
+            }
+
             if (current.size > MAX_LOGS) {
-                current.removeAt(0)
+                // Remove oldest entries, but also clean up debugLastSeen for removed tags
+                val removed = current.subList(0, current.size - MAX_LOGS)
+                current.removeAll(removed)
             }
             _logs.value = current
         }
-        // Also log to Android logcat
+        // Also log to Android logcat (no rate limiting — logcat can handle it)
         when (level) {
             LogEntry.Level.DEBUG -> android.util.Log.d(tag, message)
             LogEntry.Level.INFO -> android.util.Log.i(tag, message)
@@ -53,6 +82,9 @@ object DebugLog {
     }
 
     fun clear() {
-        _logs.value = emptyList()
+        synchronized(this) {
+            _logs.value = emptyList()
+            debugLastSeen.clear()
+        }
     }
 }

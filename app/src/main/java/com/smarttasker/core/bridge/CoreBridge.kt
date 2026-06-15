@@ -51,7 +51,8 @@ sealed class TaskStatusResult {
         val taskId: String,
         val state: String,    // idle / running / success / failed / cancelled
         val phase: String,
-        val detail: String
+        val detail: String,
+        val aiThinking: String = ""  // AI's current observing/thinking/action for UI display
     ) : TaskStatusResult()
     data class Error(val code: CoreErrorCode, val message: String) : TaskStatusResult()
 }

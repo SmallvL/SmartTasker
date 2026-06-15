@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.smarttasker.ui.theme.SmartColors
 import com.smarttasker.core.bridge.CoreBridgeManager
 import com.smarttasker.core.bridge.CoreStatus
 import com.smarttasker.data.entity.TaskEntity
@@ -37,6 +38,7 @@ import com.smarttasker.ui.tasks.TaskDetailScreen
 import com.smarttasker.ui.runs.RunListScreen
 import com.smarttasker.ui.settings.SettingsScreen
 import com.smarttasker.ui.create.CreateTaskScreen
+import com.smarttasker.ui.trialrun.AiExecutionScreen
 import com.smarttasker.ui.trialrun.TrialRunScreen
 import com.smarttasker.ui.trialrun.TrialStepStatus
 import com.smarttasker.ui.trialrun.TrialModeSelectScreen
@@ -45,24 +47,19 @@ import com.smarttasker.ui.trialrun.RouteLearningResultScreen
 import com.smarttasker.ui.routestudio.RouteStudioScreen
 import com.smarttasker.ui.routeeditor.RouteEditorViewModel
 import com.smarttasker.ui.routeeditor.RouteEditorScreen
-import com.smarttasker.ui.stats.StatsViewModel
-import com.smarttasker.ui.stats.StatsScreen
+import com.smarttasker.data.repository.TemplateRepository
+import com.smarttasker.ui.templates.TemplateListScreen
+import com.smarttasker.ui.templates.TemplateDetailScreen
 import com.smarttasker.ui.trace.TraceExplainerScreen
 import com.smarttasker.ui.permission.PermissionDoctorScreen
 import com.smarttasker.ui.safety.SafetyGuard
 import com.smarttasker.ui.safety.SafetyConfirmDialog
-import com.smarttasker.ui.settings.SafetyPolicyScreen
-import com.smarttasker.ui.settings.CostBudgetScreen
-import com.smarttasker.ui.settings.ModelConfigScreen
-import com.smarttasker.ui.settings.PromptSettingsScreen
-import com.smarttasker.ui.settings.CoreControlScreen
 import com.smarttasker.ui.settings.DebugLogScreen
 import com.smarttasker.ui.tasks.TasksPage
 import com.smarttasker.ui.tasks.TaskViewModel
-import com.smarttasker.ui.settings.DeviceInfoScreen
-import com.smarttasker.ui.settings.ImportExportScreen
-import com.smarttasker.ui.settings.AboutScreen
 import com.smarttasker.schedule.AlarmScheduler
+import com.smarttasker.core.playback.RoutePlaybackService
+import android.content.Intent
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -75,11 +72,11 @@ sealed class Screen(
     object Home : Screen("home", "首页", Icons.Outlined.Home, Icons.Filled.Home)
     object Tasks : Screen("tasks", "任务", Icons.Outlined.CheckCircle, Icons.Filled.CheckCircle)
     object Runs : Screen("runs", "记录", Icons.Outlined.History, Icons.Filled.History)
+    object Templates : Screen("templates", "模板", Icons.Outlined.Description, Icons.Filled.Description)
     object Settings : Screen("settings", "设置", Icons.Outlined.Settings, Icons.Filled.Settings)
-    object Stats : Screen("stats", "统计", Icons.Outlined.BarChart, Icons.Filled.BarChart)
 }
 
-val bottomNavItems = listOf(Screen.Home, Screen.Tasks, Screen.Runs, Screen.Stats, Screen.Settings)
+val bottomNavItems = listOf(Screen.Home, Screen.Tasks, Screen.Runs, Screen.Templates, Screen.Settings)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +84,7 @@ fun MainNavigation(
     taskRepo: TaskRepository,
     runRepo: RunRepository,
     routeRepo: RouteRepository,
+    templateRepo: TemplateRepository,
     settingsRepo: SettingsRepository,
     traceEventRepo: TraceEventRepository,
     coreBridgeManager: CoreBridgeManager,
@@ -107,6 +105,7 @@ fun MainNavigation(
             if (showBottomBar) {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = SmartColors.accent(),
                     tonalElevation = 0.dp
                 ) {
                     bottomNavItems.forEach { screen ->
@@ -123,11 +122,11 @@ fun MainNavigation(
                                 }
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                selectedIconColor = SmartColors.accent(),
+                                selectedTextColor = SmartColors.accent(),
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                indicatorColor = SmartColors.accent().copy(alpha = 0.12f)
                             )
                         )
                     }
@@ -170,7 +169,7 @@ fun MainNavigation(
                             fontSize = 13.sp,
                             color = androidx.compose.ui.graphics.Color(0xFF0066CC),
                             modifier = Modifier.clickable {
-                                navController.navigate("core_control")
+                                navController.navigate("settings")
                             }
                         )
                     }
@@ -192,6 +191,22 @@ fun MainNavigation(
                     onCreateTask = { input ->
                         // Navigate to create with pre-filled input
                         navController.navigate("create?input=${java.net.URLEncoder.encode(input, "UTF-8")}")
+                    },
+                    onAiExecute = { input, appName ->
+                        scope.launch {
+                            val task = TaskEntity(
+                                taskId = "task_${System.currentTimeMillis()}",
+                                name = input.ifEmpty { "AI任务" },
+                                description = input,
+                                targetAppName = appName,
+                                triggerType = "manual",
+                                status = "draft",
+                                createdAt = System.currentTimeMillis(),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            taskRepo.insertTask(task)
+                            navController.navigate("ai_execution/${task.taskId}")
+                        }
                     },
                     onTaskClick = { navController.navigate("task_detail/${it.taskId}") },
                     onNavigateToTaskList = {
@@ -253,10 +268,11 @@ fun MainNavigation(
                 )
             }
 
-            // ===== Runs =====
+            // ===== Runs (with Stats tab) =====
             composable(Screen.Runs.route) {
                 RunListScreen(
                     runRepo = runRepo,
+                    taskRepo = taskRepo,
                     onRunClick = { run ->
                         if (run.status == "failed") {
                             navController.navigate("trace_explainer/${run.runId}")
@@ -264,57 +280,87 @@ fun MainNavigation(
                     }
                 )
             }
-             // ===== Stats =====
-             composable(Screen.Stats.route) {
-                 val statsCtx = androidx.compose.ui.platform.LocalContext.current
-                 val statsViewModel = remember {
-                     StatsViewModel(
-                         application = statsCtx.applicationContext as android.app.Application,
-                         runRepo = runRepo,
-                         taskRepo = taskRepo
-                     )
-                 }
-                 StatsScreen(
-                     viewModel = statsViewModel,
-                     onBack = { navController.popBackStack() }
-                 )
-             }
+
+            // ===== Templates =====
+            composable(Screen.Templates.route) {
+                TemplateListScreen(
+                    templateRepo = templateRepo,
+                    routeRepo = routeRepo,
+                    onTemplateClick = { templateId ->
+                        navController.navigate("template_detail/$templateId")
+                    },
+                    onCreateFromTemplate = { templateId ->
+                        navController.navigate("create?input=&templateId=$templateId")
+                    }
+                )
+            }
+
+            // ===== Template Detail =====
+            composable(
+                "template_detail/{templateId}",
+                arguments = listOf(navArgument("templateId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val templateId = backStackEntry.arguments?.getString("templateId") ?: ""
+                TemplateDetailScreen(
+                    templateId = templateId,
+                    templateRepo = templateRepo,
+                    routeRepo = routeRepo,
+                    onBack = { navController.popBackStack() },
+                    onCreateTask = { tid ->
+                        navController.navigate("create?input=&templateId=$tid")
+                    }
+                )
+            }
 
              // ===== Settings =====
              composable("settings") {
                 SettingsScreen(
+                    settingsRepo = settingsRepo,
+                    runRepo = runRepo,
+                    coreBridgeManager = coreBridgeManager,
                     onNavigateToPermissions = { navController.navigate("permissions") },
-                    onNavigateToSafetyPolicy = { navController.navigate("safety_policy") },
-                    onNavigateToCostBudget = { navController.navigate("cost_budget") },
-                    onNavigateToModelConfig = { navController.navigate("model_config") },
-                    onNavigateToPromptSettings = { navController.navigate("prompt_settings") },
-                    onNavigateToCoreStart = { navController.navigate("core_control") },
-                    onNavigateToDeviceInfo = { navController.navigate("device_info") },
-                    onNavigateToImportExport = { navController.navigate("import_export") },
-                    onNavigateToAbout = { navController.navigate("about") },
                     onNavigateToDebugLog = { navController.navigate("debug_log") }
                 )
             }
 
             // ===== Create Task =====
             composable(
-                "create?input={input}",
-                arguments = listOf(navArgument("input") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                })
+                "create?input={input}&templateId={templateId}",
+                arguments = listOf(
+                    navArgument("input") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("templateId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }
+                )
             ) { backStackEntry ->
                 val initialInput = backStackEntry.arguments?.getString("input") ?: ""
+                val templateId = backStackEntry.arguments?.getString("templateId") ?: ""
+
                 CreateTaskScreen(
                     taskRepo = taskRepo,
                     coreBridgeManager = coreBridgeManager,
                     settingsRepo = settingsRepo,
+                    templateRepo = templateRepo,
+                    routeRepo = routeRepo,
                     initialInput = java.net.URLDecoder.decode(initialInput, "UTF-8"),
-                    onTaskCreated = { task ->
+                    templateId = templateId,
+                    onTaskCreated = { task, fromTemplate ->
                         scope.launch {
                             taskRepo.insertTask(task)
-                            navController.navigate("trial/${task.taskId}") {
-                                popUpTo("create?input={input}") { inclusive = true }
+                            if (fromTemplate) {
+                                // 模板创建的任务已有路线，直接跳转到任务详情
+                                navController.navigate("task_detail/${task.taskId}") {
+                                    popUpTo("create?input={input}&templateId={templateId}") { inclusive = true }
+                                }
+                            } else {
+                                // 非模板任务需要试跑学习路线
+                                navController.navigate("trial/${task.taskId}") {
+                                    popUpTo("create?input={input}&templateId={templateId}") { inclusive = true }
+                                }
                             }
                         }
                     },
@@ -333,9 +379,15 @@ fun MainNavigation(
                     taskRepo = taskRepo,
                     runRepo = runRepo,
                     routeRepo = routeRepo,
+                    templateRepo = templateRepo,
                     onBack = { navController.popBackStack() },
                     onOpenRouteStudio = { routeId, taskName -> navController.navigate("route_studio/$routeId/${java.net.URLEncoder.encode(taskId, "UTF-8")}?taskName=${java.net.URLEncoder.encode(taskName, "UTF-8")}") },
-                    onStartTrial = { task -> navController.navigate("trial/${task.taskId}") }
+                    onStartTrial = { task -> navController.navigate("trial/${task.taskId}") },
+                    onRunClick = { run ->
+                        if (run.status == "failed") {
+                            navController.navigate("trace_explainer/${run.runId}")
+                        }
+                    }
                 )
             }
 
@@ -371,29 +423,16 @@ fun MainNavigation(
                             )
                         }
                         "ai" -> {
-                            TrialRunScreen(
+                            AiExecutionScreen(
                                 task = task!!,
                                 executionService = executionService,
-                                onComplete = { steps ->
-                                    scope.launch {
-                                        val typeSummaries = steps
-                                            .filter { it.status == TrialStepStatus.SUCCESS }
-                                            .map { step ->
-                                                // Infer step type from summary
-                                                val type = when {
-                                                    step.summary.contains("打开") -> "open_app"
-                                                    step.summary.contains("输入") || step.summary.contains("搜索") -> "input"
-                                                    step.summary.contains("滑动") -> "swipe"
-                                                    step.summary.contains("等待") -> "wait"
-                                                    step.summary.contains("返回") -> "back"
-                                                    else -> "tap"
-                                                }
-                                                type to step.summary
-                                            }
-                                        val routeId = if (typeSummaries.isNotEmpty()) {
-                                            routeRepo.saveFromTrialSteps(task!!.taskId, typeSummaries)
-                                        } else ""
+                                onComplete = { success, routeId ->
+                                    if (success && routeId != null) {
                                         navController.navigate("learning_result/${task!!.taskId}?routeId=$routeId") {
+                                            popUpTo("trial/${task!!.taskId}") { inclusive = true }
+                                        }
+                                    } else {
+                                        navController.navigate("learning_result/${task!!.taskId}?routeId=") {
                                             popUpTo("trial/${task!!.taskId}") { inclusive = true }
                                         }
                                     }
@@ -416,6 +455,29 @@ fun MainNavigation(
                             )
                         }
                     }
+                }
+            }
+
+            // ===== AI Execution =====
+            composable(
+                "ai_execution/{taskId}",
+                arguments = listOf(navArgument("taskId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+                var task by remember { mutableStateOf<TaskEntity?>(null) }
+                LaunchedEffect(taskId) { task = taskRepo.getTaskById(taskId) }
+
+                if (task != null) {
+                    AiExecutionScreen(
+                        task = task!!,
+                        executionService = executionService,
+                        onComplete = { success, routeId ->
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Home.route) { inclusive = true }
+                            }
+                        },
+                        onCancel = { navController.popBackStack() }
+                    )
                 }
             }
 
@@ -450,6 +512,7 @@ fun MainNavigation(
                                 if (task!!.triggerType == "schedule") {
                                     AlarmScheduler.scheduleAlarm(ctx, task!!, routeId)
                                 }
+                                // For manual tasks, just save and go home — don't auto-execute
                                 navController.navigate(Screen.Home.route) { popUpTo(Screen.Home.route) { inclusive = true } }
                             }
                         },
@@ -528,14 +591,6 @@ fun MainNavigation(
                 )
             }
 
-            // ===== Safety Policy =====
-            composable("safety_policy") {
-                SafetyPolicyScreen(
-                    settingsRepo = settingsRepo,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
             // ===== Trace Explainer =====
             composable(
                 "trace_explainer/{runId}",
@@ -561,40 +616,6 @@ fun MainNavigation(
                 }
             }
 
-            // ===== Cost Budget =====
-            composable("cost_budget") {
-                CostBudgetScreen(
-                    runRepo = runRepo,
-                    settingsRepo = settingsRepo,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            // ===== Model Config =====
-            composable("model_config") {
-                ModelConfigScreen(
-                    settingsRepo = settingsRepo,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            // ===== Prompt Settings =====
-            composable("prompt_settings") {
-                PromptSettingsScreen(
-                    settingsRepo = settingsRepo,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            // ===== Core Control =====
-            composable("core_control") {
-                CoreControlScreen(
-                    coreBridgeManager = coreBridgeManager,
-                    settingsRepo = settingsRepo,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
             // ===== Debug Log =====
             composable("debug_log") {
                 DebugLogScreen(
@@ -602,26 +623,6 @@ fun MainNavigation(
                 )
             }
 
-            // ===== Device Info =====
-            composable("device_info") {
-                DeviceInfoScreen(
-                    coreBridgeManager = coreBridgeManager,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            // ===== Import/Export =====
-            composable("import_export") {
-                ImportExportScreen(
-                    settingsRepo = settingsRepo,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            // ===== About =====
-            composable("about") {
-                AboutScreen(onBack = { navController.popBackStack() })
-            }
         } // NavHost
     } // Column
     } // Scaffold

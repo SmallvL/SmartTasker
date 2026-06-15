@@ -191,6 +191,79 @@ fun SectionHeader(
     }
 }
 
+// ── Colored icon background box (40dp rounded square with 12% alpha) ──
+@Composable
+fun IconBox(
+    icon: ImageVector,
+    color: Color
+) {
+    Surface(
+        shape = RoundedCornerShape(10),
+        color = color.copy(alpha = 0.12f),
+        modifier = Modifier.size(40.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = color
+            )
+        }
+    }
+}
+
+// ── Section header with colored icon box ──
+@Composable
+fun SectionHeaderWithIcon(
+    icon: ImageVector,
+    title: String,
+    color: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8),
+            color = color.copy(alpha = 0.12f),
+            modifier = Modifier.size(28.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = color
+                )
+            }
+        }
+        Text(
+            title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+            letterSpacing = 0.5.sp
+        )
+    }
+}
+
+// ── Settings divider (indented) ──
+@Composable
+fun SettingsDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 56.dp, top = 4.dp, bottom = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Divider(color = SmartColors.borderSubtle().copy(alpha = 0.5f))
+    }
+}
+
 // Empty state
 @Composable
 fun EmptyState(

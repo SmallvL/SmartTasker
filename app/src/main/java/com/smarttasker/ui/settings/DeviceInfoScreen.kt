@@ -10,11 +10,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarttasker.core.bridge.*
+import com.smarttasker.ui.common.IconBox
+import com.smarttasker.ui.common.SectionHeaderWithIcon
+import com.smarttasker.ui.common.SettingsDivider
 import com.smarttasker.ui.common.SmartCard
 import com.smarttasker.ui.common.SmartButton
 import com.smarttasker.ui.common.StatusPill
@@ -36,214 +40,218 @@ fun DeviceInfoScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设备信息") },
+                title = { Text("设备信息", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Outlined.ArrowBack, contentDescription = "返回")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = SmartColors.textSecondary()
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            // Device summary card
+            // Device summary card with icon box
             item {
                 SmartCard {
-                    Column(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconBox(
+                            icon = Icons.Outlined.PhoneAndroid,
+                            color = Color(0xFFF59E0B)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${Build.MANUFACTURER} ${Build.MODEL}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Android ${Build.VERSION.RELEASE}",
+                                fontSize = 14.sp,
+                                color = SmartColors.textTertiary()
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Section: Device details
+            item {
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.Info,
+                    title = "设备详情",
+                    color = Color(0xFF5B6EF5)
+                )
+            }
+
+            item {
+                SmartCard {
+                    val deviceInfo = listOf(
+                        Triple(Icons.Outlined.PhoneAndroid, "设备型号", Build.MODEL),
+                        Triple(Icons.Outlined.Business, "制造商", Build.MANUFACTURER),
+                        Triple(Icons.Outlined.Android, "Android 版本", Build.VERSION.RELEASE),
+                        Triple(Icons.Outlined.Code, "SDK 版本", "${Build.VERSION.SDK_INT}"),
+                        Triple(Icons.Outlined.Fingerprint, "设备 ID", Build.ID)
+                    )
+
+                    deviceInfo.forEachIndexed { index, (icon, label, value) ->
+                        if (index > 0) {
+                            SettingsDivider()
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconBox(
+                                icon = icon,
+                                color = Color(0xFF5B6EF5)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(label, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                                Text(value, fontSize = 13.sp, color = SmartColors.textTertiary())
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section: Core status
+            item {
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.PowerSettingsNew,
+                    title = "Core 状态",
+                    color = Color(0xFFF59E0B)
+                )
+            }
+
+            item {
+                SmartCard {
+                    // CoreBridge 连接
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Outlined.PhoneAndroid,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = SmartColors.accent()
+                        IconBox(
+                            icon = Icons.Outlined.PowerSettingsNew,
+                            color = Color(0xFFF59E0B)
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "${Build.MANUFACTURER} ${Build.MODEL}",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = SmartColors.textSecondary()
-                        )
-                        Text(
-                            text = "Android ${Build.VERSION.RELEASE}",
-                            fontSize = 14.sp,
-                            color = SmartColors.textSecondary()
-                        )
-                    }
-                }
-            }
-
-            // Device info section
-            item {
-                SmartCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "设备详情",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = SmartColors.textSecondary()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Divider(color = SmartColors.borderSubtle())
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        val deviceInfo = listOf(
-                            "设备型号" to Build.MODEL,
-                            "制造商" to Build.MANUFACTURER,
-                            "Android 版本" to Build.VERSION.RELEASE,
-                            "SDK 版本" to "${Build.VERSION.SDK_INT}",
-                            "设备 ID" to Build.ID
-                        )
-
-                        deviceInfo.forEachIndexed { index, (label, value) ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = SmartColors.textSecondary(),
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Text(
-                                    text = value,
-                                    color = SmartColors.textSecondary()
-                                )
-                            }
-                            if (index < deviceInfo.lastIndex) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ADB/Core status section
-            item {
-                SmartCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Core 状态",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = SmartColors.textSecondary()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Divider(color = SmartColors.borderSubtle())
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "CoreBridge 连接",
-                                color = SmartColors.textSecondary()
-                            )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("CoreBridge 连接", fontWeight = FontWeight.Medium, fontSize = 15.sp)
                             if (coreStatus is CoreStatus.Running) {
-                                StatusPill(
-                                    text = "Core 已连接",
-                                    color = SmartColors.success()
-                                )
+                                StatusPill(text = "Core 已连接", color = SmartColors.success())
                             } else if (coreStatus is CoreStatus.ShellOnly) {
-                                StatusPill(
-                                    text = "基础模式",
-                                    color = SmartColors.warning()
-                                )
+                                StatusPill(text = "基础模式", color = SmartColors.warning())
                             } else {
-                                StatusPill(
-                                    text = "Core 未连接",
-                                    color = SmartColors.warning()
-                                )
+                                StatusPill(text = "Core 未连接", color = SmartColors.warning())
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                    SettingsDivider()
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "无障碍服务",
-                                color = SmartColors.textSecondary()
-                            )
-                            StatusPill(
-                                text = "需手动检查",
-                                color = SmartColors.warning()
-                            )
+                    // 无障碍服务
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconBox(
+                            icon = Icons.Outlined.Accessibility,
+                            color = Color(0xFF8B5CF6)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("无障碍服务", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                            StatusPill(text = "需手动检查", color = SmartColors.warning())
                         }
                     }
                 }
             }
 
-            // Device inspection buttons
+            // Section: Device inspection
+            item {
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.Search,
+                    title = "设备检查",
+                    color = Color(0xFF06B6D4)
+                )
+            }
+
             item {
                 SmartCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "设备检查",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = SmartColors.textSecondary()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Divider(color = SmartColors.borderSubtle())
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        SmartButton(
-                            text = "获取页面结构",
-                            onClick = {
-                                isLoadingHierarchy = true
-                                scope.launch {
-                                    when (val result = coreBridgeManager.bridge.dumpHierarchy()) {
-                                        is HierarchyResult.Success -> hierarchyXml = result.xml.take(2000)
-                                        is HierarchyResult.Error -> hierarchyXml = "错误: ${result.message}"
-                                    }
-                                    isLoadingHierarchy = false
-                                }
-                            },
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconBox(
                             icon = Icons.Outlined.AccountTree,
-                            enabled = !isLoadingHierarchy && (coreStatus is CoreStatus.Running || coreStatus is CoreStatus.ShellOnly)
+                            color = Color(0xFF06B6D4)
                         )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("获取页面结构", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                            Text("查看当前界面的 UI 层级", fontSize = 13.sp, color = SmartColors.textTertiary())
+                        }
+                    }
 
-                        if (isLoadingHierarchy) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = SmartColors.accent()
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "正在获取...",
-                                    fontSize = 14.sp,
-                                    color = SmartColors.textSecondary()
-                                )
+                    Spacer(Modifier.height(12.dp))
+
+                    SmartButton(
+                        text = "获取页面结构",
+                        onClick = {
+                            isLoadingHierarchy = true
+                            scope.launch {
+                                when (val result = coreBridgeManager.bridge.dumpHierarchy()) {
+                                    is HierarchyResult.Success -> hierarchyXml = result.xml.take(2000)
+                                    is HierarchyResult.Error -> hierarchyXml = "错误: ${result.message}"
+                                }
+                                isLoadingHierarchy = false
                             }
+                        },
+                        icon = Icons.Outlined.AccountTree,
+                        enabled = !isLoadingHierarchy && (coreStatus is CoreStatus.Running || coreStatus is CoreStatus.ShellOnly)
+                    )
+
+                    if (isLoadingHierarchy) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = SmartColors.accent()
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "正在获取...",
+                                fontSize = 14.sp,
+                                color = SmartColors.textTertiary()
+                            )
                         }
                     }
                 }
@@ -253,35 +261,34 @@ fun DeviceInfoScreen(
             if (hierarchyXml != null) {
                 item {
                     SmartCard {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "页面结构",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = SmartColors.textSecondary()
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Divider(color = SmartColors.borderSubtle())
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = hierarchyXml ?: "",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = SmartColors.textSecondary(),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 300.dp)
-                            )
-                        }
+                        Text(
+                            text = "页面结构",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = hierarchyXml ?: "",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = SmartColors.textSecondary(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp)
+                        )
                     }
                 }
             }
 
-            // ADB Setup Guide
+            // Section: ADB Setup Guide
             item {
-                Text("开启 ADB 调试", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = SmartColors.textTertiary(), modifier = Modifier.padding(start = 4.dp))
+                SectionHeaderWithIcon(
+                    icon = Icons.Outlined.Usb,
+                    title = "开启 ADB 调试",
+                    color = Color(0xFFF59E0B)
+                )
             }
+
             item {
                 SmartCard {
                     Text("ADB 是连接 Core 的必要条件", fontWeight = FontWeight.Medium, fontSize = 15.sp)
@@ -328,6 +335,11 @@ fun DeviceInfoScreen(
                         fontSize = 13.sp, color = SmartColors.textTertiary()
                     )
                 }
+            }
+
+            // Bottom spacer
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
