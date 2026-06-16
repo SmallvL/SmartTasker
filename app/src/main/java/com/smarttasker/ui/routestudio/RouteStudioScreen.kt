@@ -58,6 +58,7 @@ import com.smarttasker.data.repository.RouteRepository
 import com.smarttasker.data.repository.RunRepository
 import com.smarttasker.ui.common.*
 import com.smarttasker.ui.theme.SmartColors
+import com.smarttasker.util.DebugLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -128,9 +129,16 @@ fun RouteStudioScreen(
     val screenshotManager = remember { ScreenshotManager(context) }
 
     // Load publish state
+    var routeExists by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(routeId) {
-        val route = routeRepo.getRouteById(routeId)
-        isPublished = route?.status == "published"
+        try {
+            val route = routeRepo.getRouteById(routeId)
+            isPublished = route?.status == "published"
+            routeExists = route != null
+        } catch (e: Exception) {
+            DebugLog.e("RouteStudio", "load route error: ${e.message}")
+            routeExists = false
+        }
     }
 
     // Auto-dismiss publish banner
@@ -145,6 +153,35 @@ fun RouteStudioScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // ── Empty state when route does not exist ──
+            if (routeExists == false) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                "路线不存在",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.Outlined.ArrowBack, contentDescription = "返回")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
+                    )
+                    EmptyState(
+                        icon = Icons.Outlined.ErrorOutline,
+                        title = "路线不存在或已删除",
+                        subtitle = "该路线可能已被删除，请返回任务列表重新选择"
+                    )
+                }
+                return@Box
+            }
+
             Column(modifier = Modifier.fillMaxSize()) {
                 // ── Top App Bar ──
                 TopAppBar(
@@ -252,7 +289,8 @@ fun RouteStudioScreen(
                                     val isSuccess = result.startsWith("✅")
                                     val runRecord = RunRecordEntity(
                                         runId = runId,
-                                        taskId = routeId,
+                                        taskId = "",  // Will be filled by route's taskId below
+                                        routeVersion = "",
                                         status = if (isSuccess) "success" else "failed",
                                         durationMs = durationMs,
                                         modelCalls = 0,
@@ -261,7 +299,12 @@ fun RouteStudioScreen(
                                         routeSnapshot = "",
                                         retryCount = 0
                                     )
-                                    runRepo?.insertRun(runRecord)
+                                    // Look up taskId from the route itself
+                                    val currentRoute = routeRepo.getRouteById(routeId)
+                                    val finalRun = if (currentRoute != null) {
+                                        runRecord.copy(taskId = currentRoute.taskId)
+                                    } else runRecord
+                                    runRepo?.insertRun(finalRun)
                                 }
                             },
                             enabled = !isTestingRoute && steps.isNotEmpty(),

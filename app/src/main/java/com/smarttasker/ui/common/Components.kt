@@ -53,7 +53,7 @@ fun SmartCard(
     onLongClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(20)
+    val shape = RoundedCornerShape(12)
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -71,7 +71,7 @@ fun SmartCard(
         shadowElevation = 0.dp
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(16.dp),
             content = content
         )
     }

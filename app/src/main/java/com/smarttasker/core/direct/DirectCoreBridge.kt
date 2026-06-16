@@ -657,6 +657,19 @@ class DirectCoreBridge(private val context: Context) : CoreBridge {
         sb.appendLine("  <Judging_global>none</Judging_global>")
         sb.appendLine("  <Judge_global_result>none</Judge_global_result>")
         sb.appendLine("Do not output markdown, code fences, JSON, or any extra text outside these tags.")
+        sb.appendLine()
+        sb.appendLine("⚠️ CRITICAL OUTPUT REQUIREMENT ⚠️")
+        sb.appendLine("You MUST include a <command>...</command> tag in EVERY response.")
+        sb.appendLine("If <command> is missing, the entire turn is treated as a failure and the task is aborted.")
+        sb.appendLine("Allowed command signatures (pick exactly one per turn):")
+        sb.appendLine("  TAP x y")
+        sb.appendLine("  SWIPE x1 y1 x2 y2 duration_ms")
+        sb.appendLine("  INPUT \"text\"")
+        sb.appendLine("  WAIT ms")
+        sb.appendLine("  BACK")
+        sb.appendLine("  DONE summary_text")
+        sb.appendLine("  FAIL reason_text")
+        sb.appendLine("Self-check before sending: count exactly 12 tags and verify <command> is the LAST tag.")
 
         return sb.toString()
     }
@@ -724,7 +737,7 @@ class DirectCoreBridge(private val context: Context) : CoreBridge {
                     put("model", llmModel)
                     put("messages", messages)
                     put("temperature", 0.1)
-                    put("max_tokens", 1500)
+                    put("max_tokens", 3000)
                 }
 
                 DebugLog.i("DirectBridge", "Calling LLM: url=$llmApiUrl model=$llmModel multimodal=$useMultimodal")
@@ -972,12 +985,28 @@ class DirectCoreBridge(private val context: Context) : CoreBridge {
             val memoryWrite = extractTagText(response, "memory_write")
             val command = extractTagText(response, "command")
 
-            if (command.isBlank()) {
-                DebugLog.w("DirectBridge", "Missing <command> tag in response")
-                return null
+            val effectiveCommand = if (command.isBlank()) {
+                // Fallback 1: try to extract command from <action> tag
+                val extracted = extractCommandFromAction(action)
+                if (extracted != null) {
+                    DebugLog.i("DirectBridge", "Extracted command from <action>: $extracted")
+                    extracted
+                } else {
+                    // Fallback 2: try to extract TAP/SWIPE/etc. from the raw response
+                    val rawExtracted = extractCommandFromRaw(response)
+                    if (rawExtracted != null) {
+                        DebugLog.w("DirectBridge", "Recovered command from raw text: $rawExtracted")
+                        rawExtracted
+                    } else {
+                        DebugLog.w("DirectBridge", "Missing <command> tag and cannot extract from <action> or raw text")
+                        return null
+                    }
+                }
+            } else {
+                command
             }
 
-            val cmdTrimmed = command.trim()
+            val cmdTrimmed = effectiveCommand.trim()
             val parts = shellSplit(cmdTrimmed)
             if (parts.isEmpty()) return null
 
@@ -1048,6 +1077,52 @@ class DirectCoreBridge(private val context: Context) : CoreBridge {
         }
         if (current.isNotEmpty()) out.add(current.toString())
         return out
+    }
+
+    /**
+     * Fallback: extract command from <action> tag when <command> is missing.
+     * Tries to find patterns like "TAP x y", "SWIPE x1 y1 x2 y2", "DONE", "FAIL", etc.
+     */
+    private fun extractCommandFromAction(action: String): String? {
+        val trimmed = action.trim()
+        // Direct match for known ops
+        val opPattern = Regex("(?i)^(TAP|SWIPE|INPUT|WAIT|BACK|HOME|OPEN_APP|KEY|DONE|FAIL)\\b(.*)")
+        val match = opPattern.find(trimmed)
+        if (match != null) {
+            val op = match.groupValues[1].uppercase()
+            val args = match.groupValues[2].trim()
+            return if (args.isNotEmpty()) "$op $args" else op
+        }
+        // Try to find a command-like pattern anywhere in the action text
+        val inlinePattern = Regex("(?i)(TAP|SWIPE|INPUT|WAIT|BACK|HOME|OPEN_APP|KEY|DONE|FAIL)\\s+(\\d[\\d\\s.]*)")
+        val inlineMatch = inlinePattern.find(trimmed)
+        if (inlineMatch != null) {
+            return "${inlineMatch.groupValues[1].uppercase()} ${inlineMatch.groupValues[2].trim()}"
+        }
+        return null
+    }
+
+    /**
+     * Last-resort fallback: scan the raw response for any executable command pattern.
+     * Used when <command> tag and <action> tag both fail to yield a parseable command.
+     */
+    private fun extractCommandFromRaw(response: String): String? {
+        if (response.isBlank()) return null
+        // TAP / SWIPE / WAIT patterns with digits
+        val tapPattern = Regex("(?i)\\bTAP\\s+(\\d{1,4})\\s+(\\d{1,4})\\b")
+        tapPattern.find(response)?.let { return "TAP ${it.groupValues[1]} ${it.groupValues[2]}" }
+        val swipePattern = Regex("(?i)\\bSWIPE\\s+(\\d{1,4})\\s+(\\d{1,4})\\s+(\\d{1,4})\\s+(\\d{1,4})(?:\\s+(\\d{1,5}))?\\b")
+        swipePattern.find(response)?.let {
+            val dur = it.groupValues[5].ifEmpty { "400" }
+            return "SWIPE ${it.groupValues[1]} ${it.groupValues[2]} ${it.groupValues[3]} ${it.groupValues[4]} $dur"
+        }
+        val waitPattern = Regex("(?i)\\bWAIT\\s+(\\d{1,5})\\b")
+        waitPattern.find(response)?.let { return "WAIT ${it.groupValues[1]}" }
+        // Token-only commands
+        if (Regex("(?i)\\bBACK\\b").containsMatchIn(response)) return "BACK"
+        if (Regex("(?i)\\bDONE\\b").containsMatchIn(response)) return "DONE 任务完成"
+        if (Regex("(?i)\\bFAIL\\b").containsMatchIn(response)) return "FAIL 任务失败"
+        return null
     }
 
     private fun extractTagText(text: String, tag: String): String {

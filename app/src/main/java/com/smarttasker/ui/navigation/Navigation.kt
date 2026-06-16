@@ -605,11 +605,30 @@ fun MainNavigation(
                 
                 if (runData != null) {
                     val traceEvents by traceEventRepo.getEventsForRun(runId).collectAsState(initial = emptyList())
+                    val runForStudio = runData!!  // capture non-null
+                    val scopeForRoute = rememberCoroutineScope()
+                    // Collect latest published route for this task
+                    val taskRoutes by routeRepo.getRouteVersions(runForStudio.taskId).collectAsState(initial = emptyList())
+                    // Resolve task name on demand (RunRecordEntity does not store it)
+                    var resolvedTaskName by remember { mutableStateOf("任务") }
+                    LaunchedEffect(runForStudio.taskId) {
+                        if (runForStudio.taskId.isNotEmpty()) {
+                            val t = taskRepo.getTaskById(runForStudio.taskId)
+                            if (t != null) resolvedTaskName = t.name
+                        }
+                    }
                     TraceExplainerScreen(
                         run = runData!!,
                         traceEvents = traceEvents,
                         onOpenRouteStudio = {
-                            navController.navigate("route_studio/${runData!!.taskId}")
+                            val tId = runForStudio.taskId
+                            if (tId.isNotEmpty()) {
+                                val published = taskRoutes.firstOrNull { it.status == "published" }
+                                val targetRoute = published ?: taskRoutes.firstOrNull()
+                                val targetRouteId = targetRoute?.routeId ?: tId
+                                val encTaskName = java.net.URLEncoder.encode(resolvedTaskName.ifEmpty { "任务" }, "UTF-8")
+                                navController.navigate("route_studio/$targetRouteId/$tId?taskName=$encTaskName")
+                            }
                         },
                         onBack = { navController.popBackStack() }
                     )

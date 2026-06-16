@@ -827,7 +827,7 @@ private fun ModelConfigContent(settingsRepo: SettingsRepository) {
         focusedBorderColor = SmartColors.accent(),
         unfocusedBorderColor = SmartColors.borderSubtle()
     )
-    val fieldShape = RoundedCornerShape(16)
+    val fieldShape = RoundedCornerShape(10)
 
     val sectionColor = Color(0xFF8B5CF6)
 
@@ -1092,7 +1092,7 @@ private fun PromptSettingsContent(settingsRepo: SettingsRepository) {
                 .fillMaxWidth()
                 .heightIn(min = 200.dp),
             label = { Text("System Prompt") },
-            shape = RoundedCornerShape(16),
+            shape = RoundedCornerShape(12),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = SmartColors.accent(),
                 unfocusedBorderColor = SmartColors.borderSubtle()
@@ -2010,7 +2010,7 @@ private fun AboutContent() {
             Box(
                 modifier = Modifier
                     .size(80.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(

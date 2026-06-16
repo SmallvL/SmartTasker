@@ -8,6 +8,15 @@ plugins {
 
 android {
     namespace = "com.smarttasker"
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("smarttasker-release.jks")
+            storePassword = "smarttasker2024"
+            keyAlias = "smarttasker"
+            keyPassword = "smarttasker2024"
+        }
+    }
     compileSdk = 34
 
     defaultConfig {
@@ -27,6 +36,7 @@ android {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
